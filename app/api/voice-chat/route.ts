@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { SNAP_INTERVIEW_SYSTEM_PROMPT } from '@/lib/prompts';
+import { chatWithFallback } from '@/lib/openai-util';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -47,14 +48,11 @@ export async function POST(request: Request) {
       },
     ];
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1',
+    const { content: assistantResponse } = await chatWithFallback({
       messages: chatMessages,
       temperature: 0.7,
-      max_completion_tokens: 200, // Keep responses short for voice
+      maxCompletionTokens: 1000,
     });
-
-    const assistantResponse = completion.choices[0].message.content;
 
     return NextResponse.json({
       transcript: userTranscript,

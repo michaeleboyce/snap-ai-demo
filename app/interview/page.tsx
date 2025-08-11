@@ -31,6 +31,7 @@ function InterviewContent() {
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [transcript] = useState('');
+  const [coverage, setCoverage] = useState<{ household: boolean; income: boolean; expenses: boolean; assets: boolean; special: boolean; complete: boolean } | null>(null);
 
   // Initialize interview with welcome message for text mode only
   useEffect(() => {
@@ -219,12 +220,12 @@ function InterviewContent() {
             )}
             
             {/* Complete Interview Button */}
-            {messages.length > 10 && (
+            {(coverage?.complete || messages.length > 10) && (
               <div className="mt-4 flex justify-center">
                 <button
                   onClick={completeInterview}
                   disabled={isProcessing}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-6 py-3 bg-green-600 text-white rounded-xl shadow-lg hover:shadow-xl hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-base"
                 >
                   Complete Interview & Generate Summary
                   <ArrowRight className="w-5 h-5" />
@@ -236,7 +237,7 @@ function InterviewContent() {
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            <InterviewProgress messages={messages} />
+            <InterviewProgress messages={messages} onCoverageChange={setCoverage} />
 
             {/* Instructions */}
             <div className="bg-blue-50 rounded-lg p-4">

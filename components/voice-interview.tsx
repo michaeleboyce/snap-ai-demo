@@ -8,6 +8,7 @@ import { Loader2, Mic, MicOff, Phone, PhoneOff, AlertCircle } from 'lucide-react
 interface VoiceInterviewProps {
   onTranscript: (transcript: string, role: 'user' | 'assistant') => void;
   onConnectionChange: (connected: boolean) => void;
+  shouldDisconnect?: boolean;
 }
 
 interface TranscriptBuffer {
@@ -15,7 +16,7 @@ interface TranscriptBuffer {
   assistant: string;
 }
 
-export default function VoiceInterview({ onTranscript, onConnectionChange }: VoiceInterviewProps) {
+export default function VoiceInterview({ onTranscript, onConnectionChange, shouldDisconnect }: VoiceInterviewProps) {
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [isMuted, setIsMuted] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);

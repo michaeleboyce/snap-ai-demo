@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { db } from '@/lib/db';
 import { interviews } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { GPT5_SUMMARY_PROMPT } from '@/lib/prompts';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { chatWithFallback } from '@/lib/openai-util';
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -23,24 +19,17 @@ export async function POST(request: Request) {
   try {
 
     // Generate summary using GPT-5
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5',
+    const { content } = await chatWithFallback({
       messages: [
-        {
-          role: 'system',
-          content: GPT5_SUMMARY_PROMPT,
-        },
-        {
-          role: 'user',
-          content: `Interview Transcript:\n\n${tr}`,
-        },
+        { role: 'system', content: GPT5_SUMMARY_PROMPT },
+        { role: 'user', content: `Interview Transcript:\n\n${tr}` },
       ],
-      response_format: { type: 'json_object' },
-      temperature: 0.3, // Lower temperature for more consistent summaries
-      max_completion_tokens: 2000,
+      responseFormat: { type: 'json_object' },
+      temperature: 0.3,
+      maxCompletionTokens: 3000,
     });
 
-    const summary = JSON.parse(completion.choices[0].message.content || '{}');
+    const summary = JSON.parse(content || '{}');
 
     // Update the interview with the summary
     await db.update(interviews)
@@ -60,24 +49,17 @@ export async function POST(request: Request) {
     console.error('Error generating summary:', error);
     // Fallback to GPT-4.1 if GPT-5 fails, using already-read body
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4.1',
+      const { content: fbContent } = await chatWithFallback({
         messages: [
-          {
-            role: 'system',
-            content: GPT5_SUMMARY_PROMPT,
-          },
-          {
-            role: 'user',
-            content: `Interview Transcript:\n\n${tr}`,
-          },
+          { role: 'system', content: GPT5_SUMMARY_PROMPT },
+          { role: 'user', content: `Interview Transcript:\n\n${tr}` },
         ],
-        response_format: { type: 'json_object' },
+        responseFormat: { type: 'json_object' },
         temperature: 0.3,
-        max_completion_tokens: 2000,
+        maxCompletionTokens: 3000,
       });
 
-      const summary = JSON.parse(completion.choices[0].message.content || '{}');
+      const summary = JSON.parse(fbContent || '{}');
 
       await db.update(interviews)
         .set({

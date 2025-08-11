@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { db } from '@/lib/db';
 import { interviews } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { extractInterviewData, calculateSNAPEligibility } from '@/lib/interview-extractor';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { chatWithFallback } from '@/lib/openai-util';
 
 export async function POST(request: Request) {
   try {
@@ -45,46 +41,17 @@ export async function POST(request: Request) {
     - case_notes (important observations, inconsistencies, follow-up needed)
     - recommendation (approve/deny/pending with reasoning)`;
 
-    let completion;
-    try {
-      // Try GPT-5 first
-      completion = await openai.chat.completions.create({
-        model: 'gpt-5',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: `Analyze this SNAP interview transcript and provide a structured summary:\n\n${transcript}`,
-          },
-        ],
-        response_format: { type: 'json_object' },
-        max_completion_tokens: 1500,
-      });
-    } catch {
-      console.log('GPT-5 not available, falling back to GPT-4');
-      // Fallback to GPT-4
-      completion = await openai.chat.completions.create({
-        model: 'gpt-4.1',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: `Analyze this SNAP interview transcript and provide a structured summary:\n\n${transcript}`,
-          },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-        max_completion_tokens: 1500,
-      });
-    }
+    const { content: aiContent, modelUsed } = await chatWithFallback({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Analyze this SNAP interview transcript and provide a structured summary:\n\n${transcript}` },
+      ],
+      responseFormat: { type: 'json_object' },
+      temperature: 0.3,
+      maxCompletionTokens: 1500,
+    });
 
-    const aiSummary = JSON.parse(completion.choices[0].message.content || '{}');
+    const aiSummary = JSON.parse(aiContent || '{}');
 
     // Combine AI analysis with extracted data
     const enhancedSummary = {
@@ -94,7 +61,7 @@ export async function POST(request: Request) {
       metadata: {
         session_id: sessionId,
         generated_at: new Date().toISOString(),
-        ai_model: completion.model,
+        ai_model: modelUsed,
         extraction_version: '2.0',
       },
     };

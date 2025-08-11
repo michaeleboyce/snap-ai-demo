@@ -14,9 +14,10 @@ interface InterviewSection {
 
 interface InterviewProgressProps {
   messages: Array<{ role: string; content: string }>;
+  onCoverageChange?: (coverage: { household: boolean; income: boolean; expenses: boolean; assets: boolean; special: boolean; complete: boolean }) => void;
 }
 
-export default function InterviewProgress({ messages }: InterviewProgressProps) {
+export default function InterviewProgress({ messages, onCoverageChange }: InterviewProgressProps) {
   const [aiSections, setAISections] = useState<Record<string, boolean> | null>(null);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [aiError, setAIError] = useState<string | null>(null);
@@ -109,9 +110,9 @@ export default function InterviewProgress({ messages }: InterviewProgressProps) 
       completed: false,
       required: true,
       questions: [
-        'Do you have a bank account?',
-        'Do you own a vehicle?',
-        'Do you have any savings?',
+        'Do you have any bank or credit union accounts (checking or savings)?',
+        'Do you own any vehicles? If so, how many and what are they worth?',
+        'Do you have any savings, cash on hand, or retirement accounts (401k/IRA)?',
       ],
     },
     {
@@ -237,6 +238,22 @@ export default function InterviewProgress({ messages }: InterviewProgressProps) 
   const completedCount = sections.filter(s => s.completed).length;
   const requiredCount = sections.filter(s => s.required).length;
   const completionPercentage = Math.round((completedCount / sections.length) * 100);
+
+  // Compute and notify parent of coverage state after render to avoid setState during render
+  const coverageState = {
+    household: !!sections.find(s => s.id === 'household')?.completed,
+    income: !!sections.find(s => s.id === 'income')?.completed,
+    expenses: !!sections.find(s => s.id === 'expenses')?.completed,
+    assets: !!sections.find(s => s.id === 'assets')?.completed,
+    special: !!sections.find(s => s.id === 'special')?.completed,
+    complete: sections.filter(s => s.required).every(s => s.completed),
+  };
+
+  useEffect(() => {
+    if (onCoverageChange) {
+      onCoverageChange(coverageState);
+    }
+  }, [onCoverageChange, coverageState.household, coverageState.income, coverageState.expenses, coverageState.assets, coverageState.special, coverageState.complete]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border p-4">

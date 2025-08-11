@@ -1,5 +1,6 @@
 import { RealtimeAgent, tool } from '@openai/agents/realtime';
 import { z } from 'zod';
+import { chatWithFallback } from '@/lib/openai-util';
 
 // Define the SNAP interview agent following Connecticut DSS QA best practices
 export const snapInterviewAgent = new RealtimeAgent({
@@ -39,6 +40,12 @@ DISCREPANCY DETECTION:
 - If expenses exceed income, ask about other support
 - If answers are vague, ask for specific amounts
 - Flag missing information for follow-up
+
+REQUIRED COVERAGE POLICY:
+- You must ensure all required sections are fully covered: Household, Income, Expenses, Assets & Resources.
+- After each applicant response, if uncertain, call the assess_coverage tool with the known transcript so far.
+- If any required section is not covered, ask targeted, specific follow-up questions for ONLY the missing sections, prioritizing Assets & Resources when incomplete.
+- When you believe the interview is finished, call check_interview_complete with the current transcript. If it indicates complete and you have given a friendly closing (e.g., "Thank you for your time!"), then clearly say: "INTERVIEW_COMPLETE" and provide a brief verbal summary. Otherwise, continue asking for the missing required sections.
 
 Remember: You MUST start speaking immediately when connected. Do not wait for any input.`,
   handoffDescription: 'SNAP benefits interview specialist',
@@ -99,6 +106,93 @@ const calculateEstimatedBenefit = tool({
 
 // Add tools to the agent
 snapInterviewAgent.tools = [escalateToSupervisor, calculateEstimatedBenefit];
+
+// Tool: assess coverage of transcript for required sections
+const assessCoverage = tool({
+  name: 'assess_coverage',
+  description: 'Given the transcript so far, return which sections are covered (household, income, expenses, assets, special).',
+  parameters: z.object({
+    transcript: z.string().describe('The full transcript so far'),
+  }),
+  execute: async ({ transcript }) => {
+    const systemPrompt = `You are assessing a SNAP interview transcript to determine whether key sections were covered.
+Return ONLY strict JSON with booleans for each section id.
+
+Sections to assess (true if the interviewer asked and the applicant provided a substantive answer):
+- household: household composition (who lives there, sizes/ages/relationships)
+- income: work/income sources and amounts or lack thereof
+- expenses: housing/utilities/medical/childcare costs
+- assets: bank accounts, vehicles, property, savings, retirement accounts
+- special: disability, elderly, pregnancy, students
+
+Output JSON:
+{"sections":{"household":boolean,"income":boolean,"expenses":boolean,"assets":boolean,"special":boolean}}`;
+    const { content } = await chatWithFallback({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Transcript to assess:\n\n${transcript}` },
+      ],
+      responseFormat: { type: 'json_object' },
+      maxCompletionTokens: 300,
+    });
+    return content ?? '{}';
+  },
+});
+
+snapInterviewAgent.tools = [
+  escalateToSupervisor,
+  calculateEstimatedBenefit,
+  assessCoverage,
+];
+
+// Tool: check interview completion by verifying required coverage
+const checkInterviewComplete = tool({
+  name: 'check_interview_complete',
+  description: 'Calls coverage assessment internally. If all required sections (household, income, expenses, assets) are covered AND the transcript includes a friendly closing (e.g., "thank you for your time"), returns { complete: true, sections }, else { complete: false, sections }',
+  parameters: z.object({
+    transcript: z.string().describe('The full transcript so far'),
+  }),
+  execute: async ({ transcript }) => {
+    // First: assess coverage
+    const covSystem = `Return ONLY strict JSON {"sections":{"household":boolean,"income":boolean,"expenses":boolean,"assets":boolean,"special":boolean}}`;
+    const { content: covContent } = await chatWithFallback({
+      messages: [
+        { role: 'system', content: covSystem },
+        { role: 'user', content: `Transcript to assess:\n\n${transcript}` },
+      ],
+      responseFormat: { type: 'json_object' },
+      maxCompletionTokens: 200,
+    });
+
+    type Sections = { sections?: Partial<Record<'household'|'income'|'expenses'|'assets'|'special', boolean>> };
+    let sections: Sections['sections'] = {};
+    try {
+      const parsed = JSON.parse(covContent) as Sections;
+      sections = parsed.sections ?? {};
+    } catch {}
+
+    const requiredCovered = !!sections?.household && !!sections?.income && !!sections?.expenses && !!sections?.assets;
+    const hadClosing = /thank you for your time|that is all for now|we will get back to you soon|thank you so much/i.test(transcript);
+
+    return JSON.stringify({
+      complete: requiredCovered && hadClosing,
+      sections: {
+        household: !!sections?.household,
+        income: !!sections?.income,
+        expenses: !!sections?.expenses,
+        assets: !!sections?.assets,
+        special: !!sections?.special,
+      },
+    });
+  },
+});
+
+snapInterviewAgent.tools = [
+  escalateToSupervisor,
+  calculateEstimatedBenefit,
+  assessCoverage,
+  checkInterviewComplete,
+];
 
 // Export configuration for the session
 export const sessionConfig = {
