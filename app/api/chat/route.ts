@@ -22,12 +22,10 @@ export async function POST(request: Request) {
       })),
     ];
 
-    // Use GPT-4 for text-based chat
     const completion = await openai.chat.completions.create({
       model: 'gpt-5',
       messages: openaiMessages,
-      temperature: 0.7,
-      max_tokens: 500,
+      max_completion_tokens: 500,
     });
 
     const content = completion.choices[0].message.content;

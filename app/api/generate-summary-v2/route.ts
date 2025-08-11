@@ -60,14 +60,14 @@ export async function POST(request: Request) {
             content: `Analyze this SNAP interview transcript and provide a structured summary:\n\n${transcript}`,
           },
         ],
-        temperature: 0.3,
         response_format: { type: 'json_object' },
+        max_completion_tokens: 1500,
       });
     } catch {
       console.log('GPT-5 not available, falling back to GPT-4');
       // Fallback to GPT-4
       completion = await openai.chat.completions.create({
-        model: 'gpt-5',
+        model: 'gpt-4.1',
         messages: [
           {
             role: 'system',
@@ -80,6 +80,7 @@ export async function POST(request: Request) {
         ],
         temperature: 0.3,
         response_format: { type: 'json_object' },
+        max_completion_tokens: 1500,
       });
     }
 

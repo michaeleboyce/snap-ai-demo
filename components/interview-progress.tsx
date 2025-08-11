@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Circle, AlertCircle } from 'lucide-react';
+import { evaluateCoverageAction } from '@/app/actions/evaluate-coverage';
 
 interface InterviewSection {
   id: string;
@@ -15,6 +17,44 @@ interface InterviewProgressProps {
 }
 
 export default function InterviewProgress({ messages }: InterviewProgressProps) {
+  const [aiSections, setAISections] = useState<Record<string, boolean> | null>(null);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+  const [aiError, setAIError] = useState<string | null>(null);
+
+  const transcriptText = useMemo(() => {
+    return messages
+      .map((m) => `${m.role === 'user' ? 'Applicant' : 'Interviewer'}: ${m.content}`)
+      .join('\n\n');
+  }, [messages]);
+
+  useEffect(() => {
+    if (!transcriptText) {
+      setAISections(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setIsLoadingAI(true);
+        setAIError(null);
+        const sections = await evaluateCoverageAction(transcriptText);
+        if (cancelled) return;
+        setAISections(sections as unknown as Record<string, boolean>);
+      } catch (err) {
+        if (cancelled) return;
+        setAIError(err instanceof Error ? err.message : 'Failed to evaluate');
+        setAISections(null);
+      } finally {
+        if (!cancelled) setIsLoadingAI(false);
+      }
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [transcriptText]);
   // Advanced content analysis using multiple patterns and context
   const analyzeContent = (transcript: string, patterns: RegExp[], keywords: string[]): boolean => {
     // Check for any pattern match
@@ -185,13 +225,27 @@ export default function InterviewProgress({ messages }: InterviewProgressProps) 
     specialSection.completed = questionAsked && hasAnswer;
   }
 
+  // If AI provided a judgment, override heuristic completion values
+  if (aiSections) {
+    for (const section of sections) {
+      if (section.id in aiSections) {
+        section.completed = !!aiSections[section.id];
+      }
+    }
+  }
+
   const completedCount = sections.filter(s => s.completed).length;
   const requiredCount = sections.filter(s => s.required).length;
   const completionPercentage = Math.round((completedCount / sections.length) * 100);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border p-4">
-      <h3 className="font-semibold text-gray-900 mb-3">Interview Progress</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900">Interview Progress</h3>
+        <span className="text-xs text-gray-500">
+          {isLoadingAI ? 'Evaluating with AI…' : aiError ? 'Using heuristic estimate' : 'AI assessed'}
+        </span>
+      </div>
       
       {/* Progress Bar */}
       <div className="mb-4">

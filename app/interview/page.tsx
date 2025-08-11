@@ -42,8 +42,8 @@ function InterviewContent() {
       };
       setMessages([welcomeMessage]);
     }
-    // Voice mode greeting is handled by VoiceInterview component
-  }, [isTextMode]); // Include isTextMode dependency
+    // Voice mode greeting is handled by SimpleVoiceInterview component
+  }, [isTextMode]);
 
   // Removed auto-scroll per request; leave optional via MessageList prop
 
@@ -85,7 +85,7 @@ function InterviewContent() {
     setIsProcessing(true);
 
     try {
-      // For text mode, use GPT-4 for conversation
+      // For text mode, use GPT-4.1 for conversation
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,10 +150,10 @@ function InterviewContent() {
         <span className="text-xs font-medium">Voice Connected</span>
       </div>
     ) : null}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Interview Container */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-lg">
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Interview Container */}
+          <div className="lg:col-span-2 bg-white rounded-lg shadow-lg">
           {/* Progress Bar */}
           <div className="border-b px-6 py-4">
             <div className="flex justify-between items-center mb-2">
@@ -232,26 +232,24 @@ function InterviewContent() {
               </div>
             )}
           </div>
-        </div>
-        </div>
+          </div>
 
-        {/* Sidebar */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Progress Tracker */}
-          <InterviewProgress messages={messages} />
+          {/* Sidebar */}
+          <div className="lg:col-span-1 space-y-6">
+            <InterviewProgress messages={messages} />
 
-          {/* Instructions */}
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Interview Tips</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Answer all questions as completely as possible</li>
-              <li>• Include all household members who buy and prepare food together</li>
-              <li>• Report all sources of income for your household</li>
-              <li>• Mention any medical expenses or dependent care costs</li>
-            </ul>
+            {/* Instructions */}
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-900 mb-2">Interview Tips</h3>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Answer all questions as completely as possible</li>
+                <li>• Include all household members who buy and prepare food together</li>
+                <li>• Report all sources of income for your household</li>
+                <li>• Mention any medical expenses or dependent care costs</li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
     </AppShell>
   );
 }

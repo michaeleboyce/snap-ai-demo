@@ -10,15 +10,17 @@ const openai = new OpenAI({
 });
 
 export async function POST(request: Request) {
+  const body = await request.json();
+  const { sessionId, transcript } = body as { sessionId?: string; transcript?: string };
+  if (!sessionId || !transcript) {
+    return NextResponse.json(
+      { error: 'Session ID and transcript are required' },
+      { status: 400 }
+    );
+  }
+  const sid: string = sessionId;
+  const tr: string = transcript;
   try {
-    const { sessionId, transcript } = await request.json();
-
-    if (!sessionId || !transcript) {
-      return NextResponse.json(
-        { error: 'Session ID and transcript are required' },
-        { status: 400 }
-      );
-    }
 
     // Generate summary using GPT-5
     const completion = await openai.chat.completions.create({
@@ -30,12 +32,12 @@ export async function POST(request: Request) {
         },
         {
           role: 'user',
-          content: `Interview Transcript:\n\n${transcript}`,
+          content: `Interview Transcript:\n\n${tr}`,
         },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.3, // Lower temperature for more consistent summaries
-      max_tokens: 2000,
+      max_completion_tokens: 2000,
     });
 
     const summary = JSON.parse(completion.choices[0].message.content || '{}');
@@ -47,20 +49,17 @@ export async function POST(request: Request) {
         status: 'completed',
         completedAt: new Date(),
       })
-      .where(eq(interviews.sessionId, sessionId));
+      .where(eq(interviews.sessionId, sid));
 
     return NextResponse.json({ 
       success: true, 
       summary,
-      sessionId 
+      sessionId: sid 
     });
   } catch (error) {
     console.error('Error generating summary:', error);
-    
-    // Fallback to GPT-4.1 if GPT-5 fails
+    // Fallback to GPT-4.1 if GPT-5 fails, using already-read body
     try {
-      const { sessionId, transcript } = await request.json();
-      
       const completion = await openai.chat.completions.create({
         model: 'gpt-4.1',
         messages: [
@@ -70,12 +69,12 @@ export async function POST(request: Request) {
           },
           {
             role: 'user',
-            content: `Interview Transcript:\n\n${transcript}`,
+            content: `Interview Transcript:\n\n${tr}`,
           },
         ],
         response_format: { type: 'json_object' },
         temperature: 0.3,
-        max_tokens: 2000,
+        max_completion_tokens: 2000,
       });
 
       const summary = JSON.parse(completion.choices[0].message.content || '{}');
@@ -86,13 +85,13 @@ export async function POST(request: Request) {
           status: 'completed',
           completedAt: new Date(),
         })
-        .where(eq(interviews.sessionId, sessionId));
+      .where(eq(interviews.sessionId, sid));
 
       return NextResponse.json({ 
         success: true, 
         summary,
-        sessionId,
-        model: 'gpt-4-turbo-preview' // Indicate fallback was used
+        sessionId: sid,
+        model: 'gpt-4.1' // Indicate fallback was used
       });
     } catch (fallbackError) {
       console.error('Fallback to GPT-4 also failed:', fallbackError);

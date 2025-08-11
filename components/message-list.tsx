@@ -15,15 +15,17 @@ interface MessageListProps {
 }
 
 export default function MessageList({ messages, showTimestamps = true, autoScroll = false }: MessageListProps) {
-  const endRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!autoScroll) return;
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages, autoScroll]);
 
   return (
-    <div className="h-[520px] overflow-y-auto px-6 py-4 space-y-4">
+    <div ref={containerRef} className="h-[520px] overflow-y-auto px-6 py-4 space-y-4">
       {messages.map((message, index) => (
         <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
           <div
@@ -40,7 +42,6 @@ export default function MessageList({ messages, showTimestamps = true, autoScrol
           </div>
         </div>
       ))}
-      <div ref={endRef} />
     </div>
   );
 }
