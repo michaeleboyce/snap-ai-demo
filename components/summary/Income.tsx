@@ -1,7 +1,19 @@
 import { DollarSign } from 'lucide-react';
 
+interface IncomeSource {
+  type?: string;
+  amount?: number;
+  frequency?: string;
+}
+
+interface IncomeData {
+  total_monthly?: number;
+  verification_needed?: boolean;
+  sources?: IncomeSource[];
+}
+
 interface IncomeProps {
-  data: any;
+  data: IncomeData;
 }
 
 export default function Income({ data }: IncomeProps) {
@@ -32,8 +44,10 @@ export default function Income({ data }: IncomeProps) {
         <div className="mt-4">
           <p className="text-sm text-gray-600 mb-2">Income Sources:</p>
           <ul className="list-disc list-inside text-sm text-gray-800">
-            {data.sources.map((source: any, index: number) => (
-              <li key={index}>{JSON.stringify(source)}</li>
+            {data.sources.map((source: IncomeSource, index: number) => (
+              <li key={index}>
+                {source.type || 'Unknown source'}: ${source.amount || 0} {source.frequency ? `(${source.frequency})` : ''}
+              </li>
             ))}
           </ul>
         </div>

@@ -1,7 +1,14 @@
 import { CheckCircle } from 'lucide-react';
 
+interface EligibilityData {
+  likely_eligible?: boolean;
+  expedited_qualifying?: boolean;
+  confidence_score?: number;
+  reasons?: string[];
+}
+
 interface EligibilityProps {
-  data: any;
+  data: EligibilityData;
 }
 
 export default function Eligibility({ data }: EligibilityProps) {

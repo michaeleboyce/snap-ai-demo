@@ -63,7 +63,7 @@ export async function POST(request: Request) {
         temperature: 0.3,
         response_format: { type: 'json_object' },
       });
-    } catch (error) {
+    } catch {
       console.log('GPT-5 not available, falling back to GPT-4');
       // Fallback to GPT-4
       completion = await openai.chat.completions.create({

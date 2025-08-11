@@ -169,7 +169,7 @@ function InterviewContent() {
           </div>
 
           {/* Messages Area */}
-          <MessageList messages={messages} autoScroll={false} />
+          <MessageList messages={messages} autoScroll={true} />
           {transcript && (
             <div className="px-6 pb-4">
               <div className="bg-slate-50 text-slate-700 rounded-xl px-4 py-3 italic ring-1 ring-slate-900/5">

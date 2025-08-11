@@ -1,9 +1,8 @@
-import { NextRequest } from 'next/server';
 
 export const runtime = 'nodejs';
 
 // This endpoint acts as a proxy for the OpenAI Realtime API
-export async function GET(request: NextRequest) {
+export async function GET() {
   const apiKey = process.env.OPENAI_API_KEY;
   
   if (!apiKey) {

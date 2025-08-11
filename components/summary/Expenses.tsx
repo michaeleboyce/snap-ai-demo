@@ -1,7 +1,14 @@
 import { Home } from 'lucide-react';
 
+interface ExpensesData {
+  rent_mortgage?: number;
+  utilities?: number;
+  medical?: number;
+  total_deductions?: number;
+}
+
 interface ExpensesProps {
-  data: any;
+  data: ExpensesData;
 }
 
 export default function Expenses({ data }: ExpensesProps) {

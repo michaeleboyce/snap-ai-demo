@@ -1,7 +1,13 @@
 import { AlertCircle } from 'lucide-react';
 
+interface FlagsData {
+  missing_information?: string[];
+  inconsistencies?: string[];
+  follow_up_required?: string[];
+}
+
 interface FlagsProps {
-  data: any;
+  data: FlagsData;
 }
 
 export default function Flags({ data }: FlagsProps) {
@@ -15,7 +21,7 @@ export default function Flags({ data }: FlagsProps) {
         Flags & Follow-ups
       </h2>
 
-      {data.missing_information?.length > 0 && (
+      {data.missing_information && data.missing_information.length > 0 && (
         <div className="mb-4">
           <p className="text-sm font-semibold text-gray-700 mb-2">Missing Information:</p>
           <ul className="list-disc list-inside text-sm text-gray-600">
@@ -26,7 +32,7 @@ export default function Flags({ data }: FlagsProps) {
         </div>
       )}
 
-      {data.inconsistencies?.length > 0 && (
+      {data.inconsistencies && data.inconsistencies.length > 0 && (
         <div className="mb-4">
           <p className="text-sm font-semibold text-gray-700 mb-2">Inconsistencies Detected:</p>
           <ul className="list-disc list-inside text-sm text-gray-600">
@@ -37,7 +43,7 @@ export default function Flags({ data }: FlagsProps) {
         </div>
       )}
 
-      {data.follow_up_required?.length > 0 && (
+      {data.follow_up_required && data.follow_up_required.length > 0 && (
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">Follow-up Required:</p>
           <ul className="list-disc list-inside text-sm text-gray-600">

@@ -15,6 +15,20 @@ interface InterviewProgressProps {
 }
 
 export default function InterviewProgress({ messages }: InterviewProgressProps) {
+  // Advanced content analysis using multiple patterns and context
+  const analyzeContent = (transcript: string, patterns: RegExp[], keywords: string[]): boolean => {
+    // Check for any pattern match
+    for (const pattern of patterns) {
+      if (pattern.test(transcript)) return true;
+    }
+    // Check for multiple keyword presence (at least 2)
+    let keywordCount = 0;
+    for (const keyword of keywords) {
+      if (transcript.includes(keyword)) keywordCount++;
+    }
+    return keywordCount >= 2;
+  };
+
   const sections: InterviewSection[] = [
     {
       id: 'household',
@@ -74,59 +88,101 @@ export default function InterviewProgress({ messages }: InterviewProgressProps) 
     },
   ];
 
-  // Analyze messages to determine completed sections
-  const transcript = messages.map(m => m.content).join(' ').toLowerCase();
+  // Analyze messages to determine completed sections with advanced NLP
+  
+  // Split into user and assistant messages for better context
+  const userMessages = messages.filter(m => m.role === 'user').map(m => m.content.toLowerCase()).join(' ');
+  const assistantMessages = messages.filter(m => m.role === 'assistant').map(m => m.content.toLowerCase()).join(' ');
 
-  // Check household section
-  if (transcript.includes('household') || transcript.includes('people live') || 
-      transcript.includes('family') || transcript.includes('members')) {
-    const householdSection = sections.find(s => s.id === 'household');
-    if (householdSection && (
-      transcript.match(/\d+\s*(people|person|member)/i) ||
-      transcript.includes('live alone') ||
-      transcript.includes('by myself')
-    )) {
-      householdSection.completed = true;
-    }
+  // Check household section with sophisticated patterns
+  const householdSection = sections.find(s => s.id === 'household');
+  if (householdSection) {
+    const householdPatterns = [
+      /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*(people?|person|members?|individuals?)\b/i,
+      /\b(live|living|reside|stay)\s*(alone|by myself|with|together)\b/i,
+      /\b(household|family|home)\s*(size|members?|composition)\b/i,
+      /\b(myself|me|my spouse|my (child|children|kids?|son|daughter|parent|mother|father))\b/i
+    ];
+    const householdKeywords = ['household', 'family', 'live', 'members', 'people', 'children', 'spouse', 'alone', 'together', 'home'];
+    
+    // Check if question was asked and answered
+    const questionAsked = assistantMessages.includes('household') || assistantMessages.includes('who lives') || assistantMessages.includes('who buys');
+    const hasAnswer = analyzeContent(userMessages, householdPatterns, householdKeywords);
+    
+    householdSection.completed = questionAsked && hasAnswer;
   }
 
-  // Check income section
-  if (transcript.includes('income') || transcript.includes('earn') || 
-      transcript.includes('work') || transcript.includes('job') ||
-      transcript.includes('salary') || transcript.includes('wage')) {
-    const incomeSection = sections.find(s => s.id === 'income');
-    if (incomeSection && transcript.match(/\$?\d+/)) {
-      incomeSection.completed = true;
-    }
+  // Check income section with detailed patterns
+  const incomeSection = sections.find(s => s.id === 'income');
+  if (incomeSection) {
+    const incomePatterns = [
+      /\$?\d{1,3}(,\d{3})*(\.\d{2})?\s*(per|a|an?)\s*(hour|week|month|year)/i,
+      /\b(earn|make|receive|get|paid)\s*\$?\d+/i,
+      /\b(unemployed|no income|don't work|not working|retired)\b/i,
+      /\b(social security|disability|ssi|ssdi|unemployment|welfare|tanf|snap)\b/i,
+      /\b(salary|wage|income|pay|earnings?)\s*(is|are|:|of)?\s*\$?\d+/i
+    ];
+    const incomeKeywords = ['income', 'earn', 'work', 'job', 'salary', 'wage', 'benefits', 'unemployed', 'retired', 'disability'];
+    
+    const questionAsked = assistantMessages.includes('income') || assistantMessages.includes('earn') || assistantMessages.includes('work');
+    const hasAnswer = analyzeContent(userMessages, incomePatterns, incomeKeywords);
+    
+    incomeSection.completed = questionAsked && hasAnswer;
   }
 
-  // Check expenses section
-  if (transcript.includes('rent') || transcript.includes('utilities') || 
-      transcript.includes('expense') || transcript.includes('cost')) {
-    const expenseSection = sections.find(s => s.id === 'expenses');
-    if (expenseSection && transcript.match(/\$?\d+/)) {
-      expenseSection.completed = true;
-    }
+  // Check expenses section with comprehensive patterns
+  const expenseSection = sections.find(s => s.id === 'expenses');
+  if (expenseSection) {
+    const expensePatterns = [
+      /\b(rent|mortgage)\s*(is|:|costs?)?\s*\$?\d+/i,
+      /\b(pay|spend|costs?)\s*\$?\d+\s*(for|on)\s*(rent|utilities|electric|gas|heat)/i,
+      /\$?\d{2,4}\s*(for|in)?\s*(rent|mortgage|utilities|bills)/i,
+      /\b(utilities?|electric|gas|heat|water|phone)\s*(bill|cost|payment)?\s*(is|are|:|costs?)?\s*\$?\d+/i
+    ];
+    const expenseKeywords = ['rent', 'mortgage', 'utilities', 'electric', 'gas', 'heat', 'water', 'expense', 'cost', 'pay', 'bill'];
+    
+    const questionAsked = assistantMessages.includes('rent') || assistantMessages.includes('mortgage') || assistantMessages.includes('utilities') || assistantMessages.includes('expenses');
+    const hasAnswer = analyzeContent(userMessages, expensePatterns, expenseKeywords);
+    
+    expenseSection.completed = questionAsked && hasAnswer;
   }
 
-  // Check assets section
-  if (transcript.includes('bank') || transcript.includes('savings') || 
-      transcript.includes('vehicle') || transcript.includes('car') ||
-      transcript.includes('assets') || transcript.includes('property')) {
-    const assetSection = sections.find(s => s.id === 'assets');
-    if (assetSection) {
-      assetSection.completed = true;
-    }
+  // Check assets section with detailed validation
+  const assetSection = sections.find(s => s.id === 'assets');
+  if (assetSection) {
+    const assetPatterns = [
+      /\b(have|own|don't have|no)\s*(a)?\s*(bank|checking|savings)\s*accounts?/i,
+      /\b(car|vehicle|truck|van)\s*(worth|valued|costs?)?\s*\$?\d*/i,
+      /\b(savings?|assets?|property|properties)\s*(of|worth|valued)?\s*\$?\d*/i,
+      /\b(no savings|no assets|don't own|nothing saved)\b/i
+    ];
+    const assetKeywords = ['bank', 'savings', 'checking', 'vehicle', 'car', 'assets', 'property', 'account', 'own'];
+    
+    const questionAsked = assistantMessages.includes('bank') || assistantMessages.includes('savings') || assistantMessages.includes('vehicle') || assistantMessages.includes('assets');
+    const hasAnswer = analyzeContent(userMessages, assetPatterns, assetKeywords);
+    
+    assetSection.completed = questionAsked && hasAnswer;
   }
 
-  // Check special circumstances
-  if (transcript.includes('disabled') || transcript.includes('elderly') || 
-      transcript.includes('pregnant') || transcript.includes('student') ||
-      transcript.includes('60') || transcript.includes('sixty')) {
-    const specialSection = sections.find(s => s.id === 'special');
-    if (specialSection) {
-      specialSection.completed = true;
-    }
+  // Check special circumstances with nuanced detection
+  const specialSection = sections.find(s => s.id === 'special');
+  if (specialSection) {
+    const specialPatterns = [
+      /\b(disabled|disability|handicapped|impaired)\b/i,
+      /\b(elderly|senior|\d{2}\s*years?\s*old|over\s*60|sixty)\b/i,
+      /\b(pregnant|expecting|baby on the way)\b/i,
+      /\b(student|school|college|university|education)\b/i,
+      /\b(yes|no)\s*(disabled|elderly|pregnant|student)/i
+    ];
+    const specialKeywords = ['disabled', 'disability', 'elderly', 'pregnant', 'student', 'school', 'medical', 'condition'];
+    
+    const questionAsked = assistantMessages.includes('disabled') || assistantMessages.includes('elderly') || 
+                         assistantMessages.includes('pregnant') || assistantMessages.includes('student') ||
+                         assistantMessages.includes('special circumstances');
+    const hasAnswer = analyzeContent(userMessages, specialPatterns, specialKeywords) || 
+                     (questionAsked && (userMessages.includes('no') || userMessages.includes('none')));
+    
+    specialSection.completed = questionAsked && hasAnswer;
   }
 
   const completedCount = sections.filter(s => s.completed).length;

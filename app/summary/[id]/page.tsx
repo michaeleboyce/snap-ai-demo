@@ -11,6 +11,7 @@ import Income from '@/components/summary/Income';
 import Expenses from '@/components/summary/Expenses';
 import Flags from '@/components/summary/Flags';
 import CaseworkerNotes from '@/components/summary/CaseworkerNotes';
+import { InterviewSummary } from '@/types/database';
 
 async function getInterview(sessionId: string) {
   const result = await db.select()
@@ -38,7 +39,7 @@ export default async function SummaryPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  const summary = interview.summary as any;
+  const summary = interview.summary as InterviewSummary;
 
   return (
     <AppShell rightSlot={<div className="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-xs font-semibold">AI Generated Summary</div>}>
@@ -47,16 +48,16 @@ export default async function SummaryPage({ params }: { params: Promise<{ id: st
         </Link>
 
         <div className="bg-white rounded-2xl shadow-sm ring-1 ring-slate-900/5 p-8">
-        <SummaryHeader sessionId={id} completedAt={interview.completedAt as any} />
+        <SummaryHeader sessionId={id} completedAt={interview.completedAt?.toString() || null} />
 
           {summary ? (
             <div className="space-y-6">
-            <Eligibility data={summary.eligibility_assessment} />
-            <Household data={summary.household} />
-            <Income data={summary.income} />
-            <Expenses data={summary.expenses} />
-            <Flags data={summary.flags} />
-            <CaseworkerNotes notes={summary.caseworker_notes} />
+            <Eligibility data={summary.eligibility_assessment || {}} />
+            <Household data={summary.household || {}} />
+            <Income data={summary.income || {}} />
+            <Expenses data={summary.expenses || {}} />
+            <Flags data={summary.flags || {}} />
+            <CaseworkerNotes notes={summary.caseworker_notes || ''} />
 
               <div className="flex justify-center gap-4 pt-6 border-t">
                 <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">

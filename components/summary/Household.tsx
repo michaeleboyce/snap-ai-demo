@@ -1,7 +1,19 @@
 import { Users } from 'lucide-react';
 
+interface HouseholdMember {
+  name?: string;
+  age?: number;
+  relationship?: string;
+}
+
+interface HouseholdData {
+  size?: number;
+  composition_notes?: string;
+  members?: HouseholdMember[];
+}
+
 interface HouseholdProps {
-  data: any;
+  data: HouseholdData;
 }
 
 export default function Household({ data }: HouseholdProps) {
@@ -26,8 +38,10 @@ export default function Household({ data }: HouseholdProps) {
         <div className="mt-4">
           <p className="text-sm text-gray-600 mb-2">Members:</p>
           <ul className="list-disc list-inside text-sm text-gray-800">
-            {data.members.map((member: any, index: number) => (
-              <li key={index}>{JSON.stringify(member)}</li>
+            {data.members.map((member: HouseholdMember, index: number) => (
+              <li key={index}>
+                {member.name || 'Unknown'} - Age: {member.age || 'N/A'}, Relationship: {member.relationship || 'N/A'}
+              </li>
             ))}
           </ul>
         </div>

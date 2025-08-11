@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Upload, FileText, Check, X, Loader2 } from 'lucide-react';
+import { Upload, X, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 
 interface Document {
   id: string;
   name: string;
   type: string;
-  status: 'pending' | 'uploaded' | 'verified' | 'rejected';
+  status: 'pending' | 'uploaded' | 'rejected';
   url?: string;
   notes?: string;
 }
@@ -30,34 +30,7 @@ export default function DocumentUpload({ sessionId, onDocumentUpload }: Document
   const [uploading, setUploading] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(e.dataTransfer.files);
-    }
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    if (e.target.files && e.target.files[0]) {
-      handleFiles(e.target.files);
-    }
-  };
-
-  const handleFiles = async (files: FileList) => {
+  const handleFiles = useCallback(async (files: FileList) => {
     const file = files[0];
     if (!file) return;
 
@@ -107,6 +80,33 @@ export default function DocumentUpload({ sessionId, onDocumentUpload }: Document
     } finally {
       setUploading(null);
     }
+  }, [sessionId, onDocumentUpload]);
+
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }, [handleFiles]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    if (e.target.files && e.target.files[0]) {
+      handleFiles(e.target.files);
+    }
   };
 
   const removeDocument = (docId: string) => {
@@ -114,13 +114,29 @@ export default function DocumentUpload({ sessionId, onDocumentUpload }: Document
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
-      <h3 className="font-semibold text-gray-900 mb-4">Document Verification</h3>
+    <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-900/5 p-6">
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">Document Upload</h2>
+      
+      {/* Required Documents List */}
+      <div className="mb-6">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">Required Documents</h3>
+        <div className="space-y-2">
+          {REQUIRED_DOCUMENTS.map(doc => (
+            <div key={doc.id} className="flex items-start gap-2 text-sm">
+              <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
+              <div>
+                <span className="font-medium text-gray-900">{doc.label}</span>
+                <p className="text-gray-500 text-xs">{doc.types}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
-      {/* Upload Area */}
-      <div
+      {/* Upload Zone */}
+      <form
         className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
-          dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+          dragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -129,94 +145,63 @@ export default function DocumentUpload({ sessionId, onDocumentUpload }: Document
       >
         <input
           type="file"
-          id="file-upload"
-          className="sr-only"
+          id="document-upload"
+          className="hidden"
+          multiple
           onChange={handleChange}
           accept="image/*,.pdf,.doc,.docx"
         />
+        
         <label
-          htmlFor="file-upload"
-          className="cursor-pointer flex flex-col items-center"
+          htmlFor="document-upload"
+          className="flex flex-col items-center justify-center cursor-pointer"
         >
-          <Upload className="w-12 h-12 text-gray-400 mb-3" />
+          <Upload className="w-10 h-10 text-gray-400 mb-3" />
           <p className="text-sm text-gray-700 font-medium">
-            Click to upload or drag and drop
+            Drop files here or click to upload
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            PDF, PNG, JPG, DOC up to 10MB
+            PDF, JPG, PNG up to 10MB
           </p>
         </label>
-      </div>
+      </form>
 
       {/* Uploaded Documents */}
       {documents.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <h4 className="text-sm font-medium text-gray-700">Uploaded Documents</h4>
-          {documents.map((doc) => (
+        <div className="mt-6 space-y-2">
+          <h3 className="text-sm font-medium text-gray-700 mb-2">Uploaded Documents</h3>
+          {documents.map(doc => (
             <div
               key={doc.id}
               className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
             >
               <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-gray-400" />
+                {uploading === doc.id ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-blue-600" />
+                ) : doc.status === 'uploaded' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                ) : doc.status === 'rejected' ? (
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                ) : (
+                  <FileText className="w-5 h-5 text-gray-400" />
+                )}
                 <div>
                   <p className="text-sm font-medium text-gray-900">{doc.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {doc.status === 'pending' && 'Uploading...'}
-                    {doc.status === 'uploaded' && 'Uploaded successfully'}
-                    {doc.status === 'verified' && 'Verified'}
-                    {doc.status === 'rejected' && `Rejected: ${doc.notes}`}
-                  </p>
+                  {doc.notes && (
+                    <p className="text-xs text-red-600">{doc.notes}</p>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {doc.id === uploading && (
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                )}
-                {doc.status === 'uploaded' && (
-                  <Check className="w-4 h-4 text-green-600" />
-                )}
-                {doc.status === 'rejected' && (
-                  <X className="w-4 h-4 text-red-600" />
-                )}
-                <button
-                  onClick={() => removeDocument(doc.id)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                onClick={() => removeDocument(doc.id)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           ))}
         </div>
       )}
-
-      {/* Required Documents Checklist */}
-      <div className="mt-6">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">Required Documents</h4>
-        <div className="space-y-2">
-          {REQUIRED_DOCUMENTS.map((req) => {
-            const hasDoc = documents.some(
-              doc => doc.status === 'uploaded' || doc.status === 'verified'
-            );
-            return (
-              <div key={req.id} className="flex items-start gap-3">
-                <div className={`mt-0.5 w-4 h-4 rounded-full border-2 ${
-                  hasDoc ? 'bg-green-500 border-green-500' : 'border-gray-300'
-                }`}>
-                  {hasDoc && (
-                    <Check className="w-3 h-3 text-white" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{req.label}</p>
-                  <p className="text-xs text-gray-500">{req.types}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

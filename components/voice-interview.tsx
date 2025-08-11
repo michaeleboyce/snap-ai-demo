@@ -77,32 +77,33 @@ export default function VoiceInterview({ onTranscript, onConnectionChange }: Voi
         console.log('[VoiceInterview] Setting up transport event listeners...');
         
         // Listen to all events from the transport
-        session.transport.on('*', (event: any) => {
-          // console.log('[Transport Event]', event.type, event);
+        session.transport.on('*', (event: unknown) => {
+          const typedEvent = event as { type?: string; transcript?: string; delta?: string; text?: string };
+          // console.log('[Transport Event]', typedEvent.type, event);
           
           // Handle user input transcription
-          if (event.type === 'conversation.item.input_audio_transcription.completed') {
-            if (event.transcript) {
-              console.log('[User Transcript]', event.transcript);
-              onTranscript(event.transcript, 'user');
+          if (typedEvent.type === 'conversation.item.input_audio_transcription.completed') {
+            if (typedEvent.transcript) {
+              console.log('[User Transcript]', typedEvent.transcript);
+              onTranscript(typedEvent.transcript, 'user');
             }
           }
           
           // Handle assistant transcript chunks (streaming)
-          if (event.type === 'response.audio_transcript.delta') {
-            if (event.delta) {
+          if (typedEvent.type === 'response.audio_transcript.delta') {
+            if (typedEvent.delta) {
               setPartialTranscript(prev => ({
                 ...prev,
-                assistant: prev.assistant + event.delta
+                assistant: prev.assistant + typedEvent.delta
               }));
             }
           }
           
           // Handle completed assistant transcript
-          if (event.type === 'response.audio_transcript.done') {
-            if (event.transcript) {
-              console.log('[Assistant Transcript]', event.transcript);
-              onTranscript(event.transcript, 'assistant');
+          if (typedEvent.type === 'response.audio_transcript.done') {
+            if (typedEvent.transcript) {
+              console.log('[Assistant Transcript]', typedEvent.transcript);
+              onTranscript(typedEvent.transcript, 'assistant');
               setPartialTranscript(prev => ({ ...prev, assistant: '' }));
             }
           }
@@ -111,13 +112,13 @@ export default function VoiceInterview({ onTranscript, onConnectionChange }: Voi
           // The audio transcript events should be sufficient
 
           // Track speaking state
-          if (event.type === 'response.audio.delta') {
+          if (typedEvent.type === 'response.audio.delta') {
             setIsAISpeaking(true);
             setIsProcessing(false);
-          } else if (event.type === 'response.audio.done' || event.type === 'response.done') {
+          } else if (typedEvent.type === 'response.audio.done' || typedEvent.type === 'response.done') {
             setIsAISpeaking(false);
             setIsProcessing(false);
-          } else if (event.type === 'response.created') {
+          } else if (typedEvent.type === 'response.created') {
             setIsProcessing(true);
           }
         });
@@ -154,8 +155,9 @@ export default function VoiceInterview({ onTranscript, onConnectionChange }: Voi
         setTimeout(() => {
           console.log('[VoiceInterview] Triggering initial response (one-time)...');
           // Access the transport to send a response.create event directly
-          if (session.transport && (session.transport as any).send) {
-            (session.transport as any).send({
+          const transport = session.transport as { send?: (data: unknown) => void };
+          if (transport && transport.send) {
+            transport.send({
               type: 'response.create'
             });
             console.log('[VoiceInterview] Sent response.create event');
