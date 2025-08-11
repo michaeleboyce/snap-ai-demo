@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         role: 'system' as const,
         content: SNAP_INTERVIEW_SYSTEM_PROMPT,
       },
-      ...messages.map((m: any) => ({
+      ...messages.map((m: { role: string; content: string }) => ({
         role: m.role,
         content: m.content,
       })),

@@ -1,263 +1,339 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { RealtimeSession } from '@openai/agents/realtime';
+import { snapInterviewAgent, sessionConfig } from '@/lib/realtime-agent';
+import { Loader2, Mic, MicOff, Phone, PhoneOff, AlertCircle } from 'lucide-react';
 
 interface VoiceInterviewProps {
   onTranscript: (transcript: string, role: 'user' | 'assistant') => void;
   onConnectionChange: (connected: boolean) => void;
 }
 
+interface TranscriptBuffer {
+  user: string;
+  assistant: string;
+}
+
 export default function VoiceInterview({ onTranscript, onConnectionChange }: VoiceInterviewProps) {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [isMuted, setIsMuted] = useState(false);
-  const [isStopped, setIsStopped] = useState(false);
+  const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [partialTranscript, setPartialTranscript] = useState<TranscriptBuffer>({ user: '', assistant: '' });
+  
+  const sessionRef = useRef<RealtimeSession | null>(null);
+  const cleanupRef = useRef<boolean>(false);
+  const hasTriggeredRef = useRef<boolean>(false);
 
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const dcRef = useRef<RTCDataChannel | null>(null);
-  const hasConfiguredRef = useRef<boolean>(false);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const remoteStreamRef = useRef<MediaStream | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
+  const handleConnect = useCallback(async () => {
+    if (connectionState === 'connected' || connectionState === 'connecting') return;
+    
+    setConnectionState('connecting');
+    setError(null);
+    setIsProcessing(true);
+    console.log('[VoiceInterview] Starting connection...');
 
-  const attachRemoteAudio = () => {
-    if (!remoteAudioRef.current) {
-      const audioEl = document.createElement('audio');
-      audioEl.autoplay = true;
-      remoteAudioRef.current = audioEl;
-      document.body.appendChild(audioEl);
-    }
-    if (!remoteStreamRef.current) {
-      remoteStreamRef.current = new MediaStream();
-    }
-    remoteAudioRef.current.srcObject = remoteStreamRef.current;
-  };
-
-  const connectToRealtime = async () => {
     try {
-      setIsProcessing(true);
-      // Get ephemeral session
-      const response = await fetch('/api/realtime-token', { method: 'POST' });
-      const tokenPayload = await response.json();
-      const ephemeralKey = tokenPayload?.client_secret?.value || tokenPayload?.client_secret || tokenPayload?.value || tokenPayload?.token;
-      const model = tokenPayload?.model || 'gpt-4o-realtime-preview-2024-12-17';
-
-      if (!ephemeralKey) {
-        throw new Error('Failed to obtain ephemeral key');
-      }
-
-      // Create RTCPeerConnection
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: ['stun:stun.l.google.com:19302', 'stun:global.stun.twilio.com:3478'] },
-        ],
-        bundlePolicy: 'max-bundle',
-        rtcpMuxPolicy: 'require',
-      });
-      pcRef.current = pc;
-
-      // Remote audio
-      attachRemoteAudio();
-      pc.ontrack = (event) => {
-        if (!remoteStreamRef.current) return;
-        if (event.track.kind !== 'audio') return;
-        // Replace any existing remote audio track to avoid duplicate playback
-        remoteStreamRef.current.getTracks().forEach((t) => remoteStreamRef.current!.removeTrack(t));
-        remoteStreamRef.current.addTrack(event.track);
-        const audioEl = remoteAudioRef.current;
-        if (audioEl) {
-          const playAttempt = (async () => {
-            try { await audioEl.play(); } catch (e) { /* ignore autoplay block */ }
-          })();
-        }
-      };
-
-      // Wait for server-created data channel and use it
-      pc.ondatachannel = (e) => {
-        const dc = e.channel;
-        dcRef.current = dc;
-        dc.onopen = () => {
-          setIsConnected(true);
-          setIsProcessing(false);
-          onConnectionChange(true);
-          if (!hasConfiguredRef.current) {
-            hasConfiguredRef.current = true;
-            // Configure the session
-            dc.send(JSON.stringify({
-              type: 'session.update',
-              session: {
-                modalities: ['text', 'audio'],
-                instructions: 'You are a Connecticut SNAP benefits eligibility interviewer. Be conversational and helpful. Ask about household composition, income, and expenses.',
-                voice: 'alloy',
-                turn_detection: { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 200 },
-                input_audio_transcription: { model: 'whisper-1' },
-                temperature: 0.8,
-              },
-            }));
-            // Initial greeting (send only once)
-            dc.send(JSON.stringify({
-              type: 'response.create',
-              response: {
-                modalities: ['text', 'audio'],
-                instructions: 'Start by greeting the user and explaining this is a SNAP benefits interview that will take about 10-15 minutes. Then ask about their household composition.'
-              },
-            }));
-          }
-        };
-        dc.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            switch (data.type) {
-              case 'response.audio_transcript.delta':
-                break;
-              case 'response.audio_transcript.done':
-                if (data.transcript) onTranscript(data.transcript, 'assistant');
-                break;
-              case 'conversation.item.input_audio_transcription.completed':
-                if (data.transcript) onTranscript(data.transcript, 'user');
-                break;
-              case 'error':
-                console.error('Realtime API error:', data?.error);
-                console.error('Realtime API payload:', data);
-                break;
-            }
-          } catch {}
-        };
-      };
-
-      // Local mic
-      const localStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          channelCount: 1,
-        },
-      });
-      localStreamRef.current = localStream;
-      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
-
-      // Receive audio is negotiated automatically with send tracks; no extra recvonly transceiver to avoid duplicates
-
-      // Create SDP offer and exchange
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`, {
+      // Get ephemeral token from our API
+      console.log('[VoiceInterview] Fetching ephemeral token...');
+      const tokenResponse = await fetch('/api/realtime-token', { 
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${ephemeralKey}`,
-          'Content-Type': 'application/sdp',
-          'OpenAI-Beta': 'realtime=v1',
-        },
-        body: offer.sdp || '',
+        headers: { 'Content-Type': 'application/json' },
       });
-      const answer = await sdpResponse.text();
-      await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+      
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || `Token endpoint failed: ${tokenResponse.status}`);
+      }
+      
+      const tokenData = await tokenResponse.json();
+      console.log('[VoiceInterview] Token received:', { 
+        hasSecret: !!tokenData.client_secret,
+        model: tokenData.model 
+      });
+      
+      const apiKey = tokenData.client_secret?.value || 
+                    tokenData.client_secret || 
+                    tokenData.value || 
+                    tokenData.token;
 
-    } catch (error) {
-      console.error('Failed to connect:', error);
+      if (!apiKey) {
+        throw new Error('No API key in token response');
+      }
+
+      // Create new session with the agent
+      console.log('[VoiceInterview] Creating RealtimeSession...');
+      const session = new RealtimeSession(snapInterviewAgent, {
+        ...sessionConfig,
+        model: tokenData.model || sessionConfig.model,
+      });
+      
+      sessionRef.current = session;
+
+      // Listen to the underlying transport for raw events
+      if (session.transport) {
+        console.log('[VoiceInterview] Setting up transport event listeners...');
+        
+        // Listen to all events from the transport
+        session.transport.on('*', (event: any) => {
+          // console.log('[Transport Event]', event.type, event);
+          
+          // Handle user input transcription
+          if (event.type === 'conversation.item.input_audio_transcription.completed') {
+            if (event.transcript) {
+              console.log('[User Transcript]', event.transcript);
+              onTranscript(event.transcript, 'user');
+            }
+          }
+          
+          // Handle assistant transcript chunks (streaming)
+          if (event.type === 'response.audio_transcript.delta') {
+            if (event.delta) {
+              setPartialTranscript(prev => ({
+                ...prev,
+                assistant: prev.assistant + event.delta
+              }));
+            }
+          }
+          
+          // Handle completed assistant transcript
+          if (event.type === 'response.audio_transcript.done') {
+            if (event.transcript) {
+              console.log('[Assistant Transcript]', event.transcript);
+              onTranscript(event.transcript, 'assistant');
+              setPartialTranscript(prev => ({ ...prev, assistant: '' }));
+            }
+          }
+
+          // Note: Removed response.text.done handler to avoid duplicate transcripts
+          // The audio transcript events should be sufficient
+
+          // Track speaking state
+          if (event.type === 'response.audio.delta') {
+            setIsAISpeaking(true);
+            setIsProcessing(false);
+          } else if (event.type === 'response.audio.done' || event.type === 'response.done') {
+            setIsAISpeaking(false);
+            setIsProcessing(false);
+          } else if (event.type === 'response.created') {
+            setIsProcessing(true);
+          }
+        });
+      }
+
+      // Note: We're using transport events for real-time transcripts instead of history_updated
+      // to avoid duplicate transcript processing
+
+      session.on('audio_interrupted', () => {
+        console.log('[VoiceInterview] Audio interrupted');
+        setIsAISpeaking(false);
+        // Clear partial transcript on interruption
+        setPartialTranscript({ user: '', assistant: '' });
+      });
+
+      session.on('tool_approval_requested', (_context, _agent, request) => {
+        console.log('[VoiceInterview] Tool approval requested:', request);
+        // Auto-approve tools for demo
+        session.approve(request.approvalItem);
+      });
+
+      // Connect to the session
+      console.log('[VoiceInterview] Connecting to OpenAI Realtime API...');
+      await session.connect({ apiKey });
+      
+      console.log('[VoiceInterview] Connected successfully!');
+      setConnectionState('connected');
       setIsProcessing(false);
-    }
-  };
-  const toggleMute = () => {
-    setIsMuted((prev) => {
-      const next = !prev;
-      const stream = localStreamRef.current;
-      if (stream) stream.getAudioTracks().forEach((t) => (t.enabled = !next));
-      return next;
-    });
-  };
+      onConnectionChange(true);
 
-  const stopConversation = () => {
-    try {
-      if (dcRef.current) {
-        try { dcRef.current.close(); } catch {}
-        dcRef.current = null;
+      // Trigger the agent to start speaking by creating an initial response (one-time only)
+      if (!hasTriggeredRef.current) {
+        hasTriggeredRef.current = true;
+        setTimeout(() => {
+          console.log('[VoiceInterview] Triggering initial response (one-time)...');
+          // Access the transport to send a response.create event directly
+          if (session.transport && (session.transport as any).send) {
+            (session.transport as any).send({
+              type: 'response.create'
+            });
+            console.log('[VoiceInterview] Sent response.create event');
+          } else {
+            console.log('[VoiceInterview] Could not access transport.send');
+          }
+        }, 500);
       }
-      if (pcRef.current) {
-        try { pcRef.current.close(); } catch {}
-        pcRef.current = null;
-      }
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((t) => t.stop());
-        localStreamRef.current = null;
-      }
-      if (remoteStreamRef.current) {
-        remoteStreamRef.current.getTracks().forEach((t) => t.stop());
-        remoteStreamRef.current = null;
-      }
-    } finally {
-      setIsConnected(false);
+
+    } catch (err) {
+      console.error('[VoiceInterview] Connection failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect');
+      setConnectionState('error');
+      setIsProcessing(false);
       onConnectionChange(false);
-      setIsStopped(true);
     }
-  };
+  }, [connectionState, onTranscript, onConnectionChange]);
 
-  const startConversation = async () => {
-    setIsStopped(false);
-    await connectToRealtime();
-  };
+  const handleDisconnect = useCallback(() => {
+    console.log('[VoiceInterview] Disconnecting...');
+    cleanupRef.current = true;
+    
+    if (sessionRef.current) {
+      try {
+        // Interrupt any ongoing responses
+        sessionRef.current.interrupt();
+        // The SDK session doesn't have removeAllListeners or disconnect
+        // Just null the reference and let garbage collection handle it
+      } catch (err) {
+        console.error('[VoiceInterview] Error during disconnect:', err);
+      }
+      sessionRef.current = null;
+    }
+    
+    // Clear transcript buffers
+    setPartialTranscript({ user: '', assistant: '' });
+    
+    // Reset the trigger flag so it can trigger again on next connection
+    hasTriggeredRef.current = false;
+    
+    setConnectionState('idle');
+    setIsAISpeaking(false);
+    setIsProcessing(false);
+    onConnectionChange(false);
+    cleanupRef.current = false;
+  }, [onConnectionChange]);
 
+  const handleToggleMute = useCallback(() => {
+    if (!sessionRef.current) return;
+    
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    
+    // The SDK handles muting through the browser's MediaStream
+    // For now, we'll just track the state for UI purposes
+    console.log('[VoiceInterview] Mute toggled:', newMuted);
+  }, [isMuted]);
+
+  // Cleanup on unmount
   useEffect(() => {
-    connectToRealtime();
     return () => {
-      try { stopConversation(); } catch {}
-      if (remoteAudioRef.current) {
-        try { remoteAudioRef.current.srcObject = null; } catch {}
-        remoteAudioRef.current.remove();
-        remoteAudioRef.current = null;
+      if (sessionRef.current) {
+        handleDisconnect();
       }
     };
-  }, []);
+  }, [handleDisconnect]);
 
   return (
     <div className="flex flex-col items-center gap-4">
-      {isProcessing ? (
-        <div className="p-6">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-600 mt-2">Connecting to voice assistant...</p>
+      {/* Connection Status */}
+      <div className="flex items-center gap-2 text-sm">
+        <span className={`inline-block w-2 h-2 rounded-full ${
+          connectionState === 'connected' ? 'bg-green-500 animate-pulse' :
+          connectionState === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+          connectionState === 'error' ? 'bg-red-500' :
+          'bg-gray-400'
+        }`} />
+        <span className="text-gray-600">
+          {connectionState === 'connected' ? (
+            isAISpeaking ? 'AI is speaking...' : 
+            isProcessing ? 'AI is thinking...' :
+            isMuted ? 'Connected • Mic muted' : 
+            'Connected • Listening'
+          ) :
+          connectionState === 'connecting' ? 'Connecting...' :
+          connectionState === 'error' ? 'Connection failed' :
+          'Not connected'}
+        </span>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+          <AlertCircle className="w-4 h-4" />
+          {error}
         </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3">
-          {!isConnected || isStopped ? (
+      )}
+
+      {/* Control Buttons */}
+      <div className="flex items-center gap-3">
+        {connectionState === 'idle' || connectionState === 'error' ? (
+          <button
+            onClick={handleConnect}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Phone className="w-5 h-5" />
+            Start Voice Interview
+          </button>
+        ) : connectionState === 'connecting' ? (
+          <div className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-600 rounded-lg">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Connecting...
+          </div>
+        ) : (
+          <>
             <button
-              onClick={startConversation}
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={handleDisconnect}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
-              {isStopped ? 'Restart conversation' : 'Start conversation'}
+              <PhoneOff className="w-4 h-4" />
+              End Call
             </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={stopConversation}
-                className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-800 text-white"
-              >
-                Stop conversation
-              </button>
-              <button
-                onClick={toggleMute}
-                className={`px-4 py-2 rounded-lg transition-all ${
-                  isMuted ? 'bg-gray-600 hover:bg-gray-700' : 'bg-red-600 hover:bg-red-700'
-                } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {isMuted ? 'Unmute mic' : 'Mute mic'}
-              </button>
+            <button
+              onClick={handleToggleMute}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                isMuted 
+                  ? 'bg-gray-600 text-white hover:bg-gray-700' 
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              {isMuted ? 'Unmute' : 'Mute'}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* AI Status Indicators */}
+      {connectionState === 'connected' && (
+        <div className="flex flex-col items-center gap-2">
+          {isAISpeaking && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+              <div className="flex gap-1">
+                <span className="inline-block w-1 h-4 bg-blue-600 rounded-full animate-pulse" />
+                <span className="inline-block w-1 h-4 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.1s' }} />
+                <span className="inline-block w-1 h-4 bg-blue-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+              </div>
+              <span className="text-sm text-blue-700">AI is speaking</span>
             </div>
           )}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
-            <span>
-              {isConnected
-                ? isStopped
-                  ? 'Connected • Stopped'
-                  : isMuted
-                    ? 'Connected • Mic muted'
-                    : 'Connected • Listening'
-                : 'Disconnected'}
-            </span>
+          
+          {isProcessing && !isAISpeaking && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
+              <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+              <span className="text-sm text-gray-700">AI is thinking...</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Partial Transcript Display (for streaming) */}
+      {partialTranscript.assistant && (
+        <div className="w-full max-w-md mt-2">
+          <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700 italic">
+            {partialTranscript.assistant}...
           </div>
+        </div>
+      )}
+
+      {/* Instructions */}
+      {connectionState === 'idle' && (
+        <div className="text-center max-w-md">
+          <p className="text-sm text-gray-600 mb-2">
+            Click &quot;Start Voice Interview&quot; to begin your SNAP benefits interview.
+          </p>
+          <p className="text-xs text-gray-500">
+            You&apos;ll need to allow microphone access. The interview takes about 10-15 minutes.
+          </p>
         </div>
       )}
     </div>

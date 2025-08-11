@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Send, Loader2, Volume2, ArrowRight } from 'lucide-react';
+import { Send, Loader2, ArrowRight } from 'lucide-react';
 import { generateSessionId } from '@/lib/utils';
-import Link from 'next/link';
 import AppShell from '@/components/app-shell';
 import MessageList from '@/components/message-list';
+import InterviewProgress from '@/components/interview-progress';
 import dynamic from 'next/dynamic';
 
 const VoiceInterview = dynamic(() => import('@/components/voice-interview'), {
@@ -30,8 +30,7 @@ function InterviewContent() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [transcript] = useState('');
 
   // Initialize interview with welcome message for text mode only
   useEffect(() => {
@@ -43,8 +42,8 @@ function InterviewContent() {
       };
       setMessages([welcomeMessage]);
     }
-    // Voice mode greeting is handled by SimpleVoiceInterview component
-  }, []); // Run only once on mount
+    // Voice mode greeting is handled by VoiceInterview component
+  }, [isTextMode]); // Include isTextMode dependency
 
   // Removed auto-scroll per request; leave optional via MessageList prop
 
@@ -151,9 +150,10 @@ function InterviewContent() {
         <span className="text-xs font-medium">Voice Connected</span>
       </div>
     ) : null}>
-
-        {/* Interview Container */}
-        <div className="bg-white rounded-lg shadow-lg">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Interview Container */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-lg shadow-lg">
           {/* Progress Bar */}
           <div className="border-b px-6 py-4">
             <div className="flex justify-between items-center mb-2">
@@ -233,17 +233,25 @@ function InterviewContent() {
             )}
           </div>
         </div>
-
-        {/* Instructions */}
-        <div className="mt-6 bg-blue-50 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">Interview Tips</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Answer all questions as completely as possible</li>
-            <li>• Include all household members who buy and prepare food together</li>
-            <li>• Report all sources of income for your household</li>
-            <li>• Mention any medical expenses or dependent care costs</li>
-          </ul>
         </div>
+
+        {/* Sidebar */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Progress Tracker */}
+          <InterviewProgress messages={messages} />
+
+          {/* Instructions */}
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 mb-2">Interview Tips</h3>
+            <ul className="text-sm text-blue-800 space-y-1">
+              <li>• Answer all questions as completely as possible</li>
+              <li>• Include all household members who buy and prepare food together</li>
+              <li>• Report all sources of income for your household</li>
+              <li>• Mention any medical expenses or dependent care costs</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </AppShell>
   );
 }
