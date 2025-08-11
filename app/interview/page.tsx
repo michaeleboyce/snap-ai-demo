@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Send, Loader2, ArrowRight } from 'lucide-react';
+import { Send, Loader2, ArrowRight, AlertCircle, Phone } from 'lucide-react';
 import { generateSessionId } from '@/lib/utils';
 import AppShell from '@/components/app-shell';
 import MessageList from '@/components/message-list';
 import InterviewProgress from '@/components/interview-progress';
+import ConsentDialog from '@/components/consent-dialog';
 import dynamic from 'next/dynamic';
+import { createInterview, getInterview, saveInterviewCheckpoint, completeInterview as completeInterviewAction } from '@/app/actions/interviews';
+import { getDemoScenario } from '@/lib/demo-scenarios';
 
 const VoiceInterview = dynamic(() => import('@/components/voice-interview'), {
   ssr: false,
@@ -24,17 +27,98 @@ function InterviewContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const isTextMode = searchParams.get('mode') === 'text';
+  const resumeSessionId = searchParams.get('resume');
+  const demoScenarioId = searchParams.get('demo');
   
-  const [sessionId] = useState(() => generateSessionId());
+  const [sessionId] = useState(() => resumeSessionId || generateSessionId());
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [transcript] = useState('');
   const [coverage, setCoverage] = useState<{ household: boolean; income: boolean; expenses: boolean; assets: boolean; special: boolean; complete: boolean } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+  const [showConsent, setShowConsent] = useState(false);
+  const [hasConsented, setHasConsented] = useState(false);
+  const [interviewCreated, setInterviewCreated] = useState(false);
 
-  // Initialize interview with welcome message for text mode only
+  // Initialize interview - handle resume and demo scenarios
   useEffect(() => {
+    const initializeInterview = async () => {
+      setIsLoading(true);
+      
+      try {
+        // Handle resume scenario - skip consent for existing interviews
+        if (resumeSessionId) {
+          const existingInterview = await getInterview(resumeSessionId);
+          if (existingInterview && existingInterview.saveState) {
+            setHasConsented(true); // They already consented
+            setInterviewCreated(true);
+            const savedState = existingInterview.saveState as { transcript?: Array<{role: 'user' | 'assistant', content: string}> };
+            if (savedState.transcript) {
+              const resumedMessages = savedState.transcript.map(t => ({
+                role: t.role,
+                content: t.content,
+                timestamp: new Date(),
+              }));
+              setMessages(resumedMessages);
+              // Add a resume message
+              const resumeMessage: Message = {
+                role: 'assistant',
+                content: "Welcome back! Let's continue where we left off. " + 
+                        (existingInterview.currentSection ? 
+                         `We were discussing your ${existingInterview.currentSection}. ` : '') + 
+                        "Please continue with your responses.",
+                timestamp: new Date(),
+              };
+              setMessages(prev => [...prev, resumeMessage]);
+            }
+          } else {
+            setResumeError('Could not find or load the previous interview session.');
+          }
+        }
+        // Handle demo scenario - skip consent for demos
+        else if (demoScenarioId) {
+          setHasConsented(true); // Skip consent for demos
+          const scenario = getDemoScenario(demoScenarioId);
+          if (scenario) {
+            const demoMessages = scenario.initialTranscript.map(t => ({
+              role: t.role,
+              content: t.content,
+              timestamp: new Date(),
+            }));
+            setMessages(demoMessages);
+            // Create interview record for demo
+            await createInterview({
+              sessionId,
+              audioEnabled: !isTextMode,
+              demoScenarioId,
+            });
+            setInterviewCreated(true);
+          }
+        }
+        // New interview - show consent dialog
+        else {
+          setShowConsent(true);
+        }
+      } catch (error) {
+        console.error('Error initializing interview:', error);
+        setResumeError('Failed to initialize interview session.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    initializeInterview();
+  }, [isTextMode, resumeSessionId, demoScenarioId, sessionId]);
+
+  // Handle consent acceptance
+  const handleConsentAccept = async () => {
+    setShowConsent(false);
+    setHasConsented(true);
+    
+    // Initialize welcome message based on mode
     if (isTextMode) {
       const welcomeMessage: Message = {
         role: 'assistant',
@@ -43,8 +127,14 @@ function InterviewContent() {
       };
       setMessages([welcomeMessage]);
     }
-    // Voice mode greeting is handled by SimpleVoiceInterview component
-  }, [isTextMode]);
+    // Voice mode will start with its own welcome
+  };
+
+  // Handle consent decline
+  const handleConsentDecline = () => {
+    // Redirect to human assistance page or show contact information
+    router.push('/contact-human');
+  };
 
   // Removed auto-scroll per request; leave optional via MessageList prop
 
@@ -57,17 +147,25 @@ function InterviewContent() {
     };
     setMessages(prev => [...prev, message]);
     
-    // Save transcript periodically
-    if (messages.length % 5 === 0) {
-      fetch('/api/save-interview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          transcript: messages.map(m => `${m.role === 'user' ? 'Applicant' : 'Interviewer'}: ${m.content}`).join('\n\n'),
-          status: 'in_progress',
-          audioEnabled: true,
-        }),
+    // Save transcript periodically using server action
+    if (messages.length % 5 === 0 && messages.length > 0) {
+      const transcriptData = [...messages, message].map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+      
+      // Create interview if it doesn't exist (for new non-demo interviews)
+      getInterview(sessionId).then(existing => {
+        if (!existing) {
+          createInterview({
+            sessionId,
+            audioEnabled: true,
+          }).then(() => {
+            saveInterviewCheckpoint(sessionId, transcriptData).catch(console.error);
+          });
+        } else {
+          saveInterviewCheckpoint(sessionId, transcriptData).catch(console.error);
+        }
       });
     }
   }, [messages, sessionId]);
@@ -84,6 +182,15 @@ function InterviewContent() {
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsProcessing(true);
+
+    // Create interview on first user message if it doesn't exist
+    const existing = await getInterview(sessionId);
+    if (!existing) {
+      await createInterview({
+        sessionId,
+        audioEnabled: false,
+      });
+    }
 
     try {
       // For text mode, use GPT-4.1 for conversation
@@ -114,34 +221,35 @@ function InterviewContent() {
   const completeInterview = async () => {
     setIsProcessing(true);
     
-    // Save transcript
-    const fullTranscript = messages
-      .map(m => `${m.role === 'user' ? 'Applicant' : 'Interviewer'}: ${m.content}`)
-      .join('\n\n');
-
-    await fetch('/api/save-interview', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        transcript: fullTranscript,
-        status: 'processing',
-        audioEnabled: !isTextMode,
-      }),
-    });
-
-    // Generate summary
-    await fetch('/api/generate-summary', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId,
-        transcript: fullTranscript,
-      }),
-    });
-
-    // Navigate to summary page
-    router.push(`/summary/${sessionId}`);
+    try {
+      // Save final transcript
+      const transcriptData = messages.map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+      
+      await saveInterviewCheckpoint(sessionId, transcriptData);
+      
+      // Generate summary data
+      const userMessageCount = messages.filter(m => m.role === 'user').length;
+      const summary = {
+        totalMessages: messages.length,
+        exchangeCount: userMessageCount,
+        completedSections: Object.entries(coverage || {}).filter(([k, v]) => v && k !== 'complete').map(([k]) => k),
+        timestamp: new Date().toISOString(),
+      };
+      
+      // Mark interview as complete
+      await completeInterviewAction(sessionId, summary);
+      
+      // Navigate to summary page
+      router.push(`/summary/${sessionId}`);
+    } catch (error) {
+      console.error('Error completing interview:', error);
+      alert('Failed to complete interview. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -151,6 +259,34 @@ function InterviewContent() {
         <span className="text-xs font-medium">Voice Connected</span>
       </div>
     ) : null}>
+        {/* Consent Dialog */}
+        {showConsent && (
+          <ConsentDialog
+            onAccept={handleConsentAccept}
+            onDecline={handleConsentDecline}
+          />
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-gray-600">Loading interview...</span>
+          </div>
+        )}
+        
+        {/* Resume Error */}
+        {resumeError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-red-700">
+              <AlertCircle className="w-5 h-5" />
+              <span>{resumeError}</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Only show interview UI if consent is given */}
+        {!isLoading && hasConsented && (
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Interview Container */}
@@ -249,8 +385,30 @@ function InterviewContent() {
                 <li>• Mention any medical expenses or dependent care costs</li>
               </ul>
             </div>
+
+            {/* Human Assistance Option */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <h3 className="font-semibold text-amber-900 mb-2 flex items-center gap-2">
+                <Phone className="w-5 h-5" />
+                Need Human Assistance?
+              </h3>
+              <p className="text-sm text-amber-800 mb-3">
+                You can request to speak with a human at any time:
+              </p>
+              <ul className="text-sm text-amber-800 space-y-1 mb-4">
+                <li>• Say "I want to speak to a human"</li>
+                <li>• Call 1-855-6-CONNECT</li>
+              </ul>
+              <Link
+                href="/contact-human"
+                className="block w-full px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-center text-sm font-medium"
+              >
+                Contact Human Representative
+              </Link>
+            </div>
           </div>
         </div>
+        )}
     </AppShell>
   );
 }

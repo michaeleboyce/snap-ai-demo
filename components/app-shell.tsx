@@ -23,6 +23,23 @@ export default function AppShell({ children, showDemoBadge = true, rightSlot }: 
                 <span className="text-xs text-slate-500">US Digital Response</span>
               </div>
             </Link>
+            <nav className="flex items-center gap-6">
+              <Link href="/interview" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                Interview
+              </Link>
+              <Link href="/demo" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                Demo
+              </Link>
+              <Link href="/interview-history" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                History
+              </Link>
+              <Link href="/staff-review" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                Staff Review
+              </Link>
+              <Link href="/about" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                About
+              </Link>
+            </nav>
             <div className="flex items-center gap-3">
               {rightSlot}
               {showDemoBadge && (

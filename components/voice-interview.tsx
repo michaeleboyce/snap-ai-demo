@@ -4,11 +4,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { RealtimeSession } from '@openai/agents/realtime';
 import { snapInterviewAgent, sessionConfig } from '@/lib/realtime-agent';
 import { Loader2, Mic, MicOff, Phone, PhoneOff, AlertCircle } from 'lucide-react';
+import ConsentDialog from '@/components/consent-dialog';
 
 interface VoiceInterviewProps {
   onTranscript: (transcript: string, role: 'user' | 'assistant') => void;
   onConnectionChange: (connected: boolean) => void;
-  shouldDisconnect?: boolean;
 }
 
 interface TranscriptBuffer {
@@ -16,17 +16,27 @@ interface TranscriptBuffer {
   assistant: string;
 }
 
-export default function VoiceInterview({ onTranscript, onConnectionChange, shouldDisconnect }: VoiceInterviewProps) {
+export default function VoiceInterview({ onTranscript, onConnectionChange }: VoiceInterviewProps) {
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [isMuted, setIsMuted] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [partialTranscript, setPartialTranscript] = useState<TranscriptBuffer>({ user: '', assistant: '' });
+  const [showConsent, setShowConsent] = useState(false);
   
   const sessionRef = useRef<RealtimeSession | null>(null);
   const cleanupRef = useRef<boolean>(false);
   const hasTriggeredRef = useRef<boolean>(false);
+
+  const handleStartClick = useCallback(() => {
+    setShowConsent(true);
+  }, []);
+
+  const handleConsentDecline = useCallback(() => {
+    setShowConsent(false);
+    alert('Please call 1-855-6-CONNECT to schedule a human interview.');
+  }, []);
 
   const handleConnect = useCallback(async () => {
     if (connectionState === 'connected' || connectionState === 'connecting') return;
@@ -177,6 +187,11 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, shoul
     }
   }, [connectionState, onTranscript, onConnectionChange]);
 
+  const handleConsentAccept = useCallback(() => {
+    setShowConsent(false);
+    handleConnect();
+  }, [handleConnect]);
+
   const handleDisconnect = useCallback(() => {
     console.log('[VoiceInterview] Disconnecting...');
     cleanupRef.current = true;
@@ -185,8 +200,24 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, shoul
       try {
         // Interrupt any ongoing responses
         sessionRef.current.interrupt();
-        // The SDK session doesn't have removeAllListeners or disconnect
-        // Just null the reference and let garbage collection handle it
+        
+        // Disconnect the transport if it exists
+        if (sessionRef.current.transport) {
+          const transport = sessionRef.current.transport as any;
+          
+          // Stop media streams
+          if (transport.mediaStream) {
+            transport.mediaStream.getTracks().forEach((track: MediaStreamTrack) => {
+              track.stop();
+              console.log('[VoiceInterview] Stopped media track:', track.kind);
+            });
+          }
+          
+          // Disconnect transport
+          if (transport.disconnect) {
+            transport.disconnect();
+          }
+        }
       } catch (err) {
         console.error('[VoiceInterview] Error during disconnect:', err);
       }
@@ -219,12 +250,51 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, shoul
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => {
+    const cleanup = () => {
+      console.log('[VoiceInterview] Cleaning up voice session...');
       if (sessionRef.current) {
-        handleDisconnect();
+        try {
+          // Interrupt any ongoing responses
+          sessionRef.current.interrupt();
+          // Disconnect the transport if it exists
+          if (sessionRef.current.transport && (sessionRef.current.transport as any).disconnect) {
+            (sessionRef.current.transport as any).disconnect();
+          }
+          // Stop any media streams
+          if (sessionRef.current.transport && (sessionRef.current.transport as any).mediaStream) {
+            const stream = (sessionRef.current.transport as any).mediaStream;
+            stream.getTracks().forEach((track: MediaStreamTrack) => {
+              track.stop();
+              console.log('[VoiceInterview] Stopped media track:', track.kind);
+            });
+          }
+          // Clear the session reference
+          sessionRef.current = null;
+        } catch (err) {
+          console.error('[VoiceInterview] Error during cleanup:', err);
+        }
       }
+      // Reset states
+      setConnectionState('idle');
+      setIsAISpeaking(false);
+      setIsProcessing(false);
+      setPartialTranscript({ user: '', assistant: '' });
+      hasTriggeredRef.current = false;
     };
-  }, [handleDisconnect]);
+
+    // Cleanup on page unload
+    const handleBeforeUnload = () => {
+      cleanup();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup on component unmount
+    return () => {
+      cleanup();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []); // Empty dependency array - only run on mount/unmount
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -261,7 +331,7 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, shoul
       <div className="flex items-center gap-3">
         {connectionState === 'idle' || connectionState === 'error' ? (
           <button
-            onClick={handleConnect}
+            onClick={handleStartClick}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Phone className="w-5 h-5" />
@@ -330,15 +400,31 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, shoul
 
       {/* Instructions */}
       {connectionState === 'idle' && (
-        <div className="text-center max-w-md">
-          <p className="text-sm text-gray-600 mb-2">
-            Click &quot;Start Voice Interview&quot; to begin your SNAP benefits interview.
+        <div className="text-center max-w-md space-y-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 mb-2">Before You Begin</h3>
+            <ul className="text-sm text-blue-800 space-y-1 text-left">
+              <li>• You&apos;ll be speaking with an AI assistant</li>
+              <li>• The interview takes about 10-15 minutes</li>
+              <li>• Have income and expense information ready</li>
+              <li>• You can say &quot;I want to speak to a human&quot; at any time</li>
+            </ul>
+          </div>
+          <p className="text-sm text-gray-600">
+            Click &quot;Start Voice Interview&quot; when you&apos;re ready to begin.
           </p>
           <p className="text-xs text-gray-500">
-            You&apos;ll need to allow microphone access. The interview takes about 10-15 minutes.
+            You&apos;ll need to allow microphone access when prompted.
           </p>
         </div>
       )}
+
+      {/* Consent Dialog */}
+      <ConsentDialog
+        isOpen={showConsent}
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
+      />
     </div>
   );
 }
