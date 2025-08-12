@@ -1,12 +1,13 @@
 'use client';
 
 import { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 interface InfoCardProps {
   title: string;
   icon?: LucideIcon;
   variant?: 'success' | 'info' | 'warning' | 'neutral';
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
 }
 

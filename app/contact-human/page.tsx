@@ -19,7 +19,7 @@ export default function ContactHumanPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Contact a Human Representative</h1>
           <p className="text-lg text-gray-600">
-            We're here to help! You can reach a SNAP benefits specialist through any of the following methods:
+            We&apos;re here to help! You can reach a SNAP benefits specialist through any of the following methods:
           </p>
         </div>
 
@@ -78,7 +78,7 @@ export default function ContactHumanPage() {
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Email Support</h2>
                 <p className="text-gray-700 mb-3">
-                  Send us your questions and we'll respond within 1-2 business days
+                  Send us your questions and we&apos;ll respond within 1-2 business days
                 </p>
                 <a
                   href="mailto:dss.co@ct.gov"

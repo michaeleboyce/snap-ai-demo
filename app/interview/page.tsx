@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Send, Loader2, ArrowRight, AlertCircle, Phone } from 'lucide-react';
+import { Send, Loader2, ArrowRight, AlertCircle, Phone, CheckCircle } from 'lucide-react';
 import { generateSessionId } from '@/lib/utils';
 import AppShell from '@/components/app-shell';
 import MessageList from '@/components/message-list';
@@ -11,6 +11,10 @@ import ConsentDialog from '@/components/consent-dialog';
 import dynamic from 'next/dynamic';
 import { createInterview, getInterview, saveInterviewCheckpoint, completeInterview as completeInterviewAction } from '@/app/actions/interviews';
 import { getDemoScenario } from '@/lib/demo-scenarios';
+import Link from 'next/link';
+import { getCompletionPercentage } from '@/lib/interview-completion';
+import { useCompletion } from '@/hooks/useCompletion';
+import { useCoverage } from '@/hooks/useCoverage';
 
 const VoiceInterview = dynamic(() => import('@/components/voice-interview'), {
   ssr: false,
@@ -36,12 +40,24 @@ function InterviewContent() {
   const [inputText, setInputText] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [transcript] = useState('');
-  const [coverage, setCoverage] = useState<{ household: boolean; income: boolean; expenses: boolean; assets: boolean; special: boolean; complete: boolean } | null>(null);
+  // Use centralized coverage management
+  const { coverage } = useCoverage({ messages });
   const [isLoading, setIsLoading] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [showConsent, setShowConsent] = useState(false);
   const [hasConsented, setHasConsented] = useState(false);
-  const [interviewCreated, setInterviewCreated] = useState(false);
+  // const [interviewCreated, setInterviewCreated] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+  
+  // Use centralized completion logic
+  const {
+    isCompleting,
+    completionStatus,
+    idleWarning,
+    isReadyForCompletion,
+    completeInterview,
+    handleManualComplete,
+  } = useCompletion({ sessionId, messages, coverage, hasConsented });
 
   // Initialize interview - handle resume and demo scenarios
   useEffect(() => {
@@ -54,7 +70,7 @@ function InterviewContent() {
           const existingInterview = await getInterview(resumeSessionId);
           if (existingInterview && existingInterview.saveState) {
             setHasConsented(true); // They already consented
-            setInterviewCreated(true);
+            // setInterviewCreated(true);
             const savedState = existingInterview.saveState as { transcript?: Array<{role: 'user' | 'assistant', content: string}> };
             if (savedState.transcript) {
               const resumedMessages = savedState.transcript.map(t => ({
@@ -95,7 +111,8 @@ function InterviewContent() {
               audioEnabled: !isTextMode,
               demoScenarioId,
             });
-            setInterviewCreated(true);
+            // setInterviewCreated(true);
+            setIsDemo(true);
           }
         }
         // New interview - show consent dialog
@@ -138,14 +155,43 @@ function InterviewContent() {
 
   // Removed auto-scroll per request; leave optional via MessageList prop
 
+
   // Handle voice transcripts
-  const handleVoiceTranscript = useCallback((transcript: string, role: 'user' | 'assistant') => {
+  const handleVoiceTranscript = useCallback(async (transcript: string, role: 'user' | 'assistant') => {
     const message: Message = {
       role,
       content: transcript,
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, message]);
+    
+    // Create interview on very first message if it doesn't exist
+    if (role === 'user') {
+      try {
+        const existing = await getInterview(sessionId);
+        if (!existing) {
+          console.log('[Interview] Creating interview for first voice message:', sessionId);
+          await createInterview({
+            sessionId,
+            audioEnabled: true,
+          });
+        }
+      } catch (error) {
+        console.error('[Interview] Error creating interview for voice:', error);
+      }
+    }
+    
+    // Only route to human assistance when the USER says it (not when assistant mentions it)
+    if (role === 'user') {
+      const t = transcript.toLowerCase();
+      if (t.includes('speak to a human') || t.includes('talk to a human') || t.includes('human representative')) {
+        console.log('[Interview] User requested human assistance');
+        // Ask the voice component to perform a graceful handoff (closing message + stop recording)
+        const evt = new CustomEvent('interview:request_human');
+        window.dispatchEvent(evt);
+        return;
+      }
+    }
     
     // Save transcript periodically using server action
     if (messages.length % 5 === 0 && messages.length > 0) {
@@ -155,24 +201,41 @@ function InterviewContent() {
       }));
       
       // Create interview if it doesn't exist (for new non-demo interviews)
-      getInterview(sessionId).then(existing => {
-        if (!existing) {
-          createInterview({
-            sessionId,
-            audioEnabled: true,
-          }).then(() => {
-            saveInterviewCheckpoint(sessionId, transcriptData).catch(console.error);
-          });
-        } else {
-          saveInterviewCheckpoint(sessionId, transcriptData).catch(console.error);
+      const saveTranscript = async () => {
+        try {
+          let existing = await getInterview(sessionId);
+          if (!existing) {
+            console.log('[Interview] Creating new interview for voice session:', sessionId);
+            existing = await createInterview({
+              sessionId,
+              audioEnabled: true,
+            });
+          }
+          
+          if (existing) {
+            await saveInterviewCheckpoint(sessionId, transcriptData);
+          }
+        } catch (error) {
+          console.error('[Interview] Error saving transcript:', error);
         }
-      });
+      };
+      
+      saveTranscript();
     }
   }, [messages, sessionId]);
 
   // Send text message
   const sendTextMessage = async () => {
     if (!inputText.trim()) return;
+
+    // Check for opt-out phrases in text mode
+    if (inputText.toLowerCase().includes('speak to a human') || 
+        inputText.toLowerCase().includes('talk to a human') ||
+        inputText.toLowerCase().includes('human representative')) {
+      console.log('[Interview] User requested human assistance');
+      router.push('/contact-human');
+      return;
+    }
 
     const userMessage: Message = {
       role: 'user',
@@ -217,40 +280,17 @@ function InterviewContent() {
     }
   };
 
-  // Generate summary and complete interview
-  const completeInterview = async () => {
-    setIsProcessing(true);
-    
-    try {
-      // Save final transcript
-      const transcriptData = messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-      
-      await saveInterviewCheckpoint(sessionId, transcriptData);
-      
-      // Generate summary data
-      const userMessageCount = messages.filter(m => m.role === 'user').length;
-      const summary = {
-        totalMessages: messages.length,
-        exchangeCount: userMessageCount,
-        completedSections: Object.entries(coverage || {}).filter(([k, v]) => v && k !== 'complete').map(([k]) => k),
-        timestamp: new Date().toISOString(),
-      };
-      
-      // Mark interview as complete
-      await completeInterviewAction(sessionId, summary);
-      
-      // Navigate to summary page
-      router.push(`/summary/${sessionId}`);
-    } catch (error) {
-      console.error('Error completing interview:', error);
-      alert('Failed to complete interview. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  // Removed keyword-based auto-complete hook. Completion handled by heuristics and manual end.
+
+  // Human handoff ready: navigate after component confirms recording stopped
+  useEffect(() => {
+    const onReady = () => {
+      router.push('/contact-human');
+    };
+    window.addEventListener('interview:handoff_ready', onReady);
+    return () => window.removeEventListener('interview:handoff_ready', onReady);
+  }, [router]);
+
 
   return (
     <AppShell rightSlot={!isTextMode && isConnected ? (
@@ -295,15 +335,64 @@ function InterviewContent() {
           <div className="border-b px-6 py-4">
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm font-medium text-gray-700">Interview Progress</span>
-              <span className="text-sm text-gray-500">{messages.length} exchanges</span>
+              <span className="text-sm text-gray-500">{messages.filter(m => m.role === 'user').length} responses</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
               <div 
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${Math.min((messages.length / 20) * 100, 90)}%` }}
+                style={{ width: `${coverage ? getCompletionPercentage(coverage) : 0}%` }}
               />
             </div>
+            {completionStatus && (
+              <p className="text-xs text-gray-600">{completionStatus}</p>
+            )}
           </div>
+
+           {/* Demo Mode Banner */}
+           {isDemo && (
+             <div className="mx-6 mt-4">
+               <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm text-purple-800">
+                 Demo Mode: This session uses a scripted starting context.
+               </div>
+             </div>
+           )}
+
+           {/* Idle Warning */}
+           {idleWarning && (
+             <div className="mx-6 mt-4">
+               <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+                 {idleWarning}
+               </div>
+             </div>
+           )}
+
+           {/* Completion Ready Banner */}
+           {coverage && getCompletionPercentage(coverage) >= 100 && (
+             <div className="mx-6 mt-4">
+               <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-center gap-2">
+                 <CheckCircle className="w-5 h-5 text-green-600" />
+                 <span className="text-sm text-green-800 font-medium">
+                   Interview complete! Click the button below to submit.
+                 </span>
+               </div>
+             </div>
+           )}
+
+          {/* Voice Controls (moved higher on the page for visibility) */}
+          {!isTextMode && (
+            <div className="px-6 pt-4">
+              <div className="flex flex-col items-center gap-4">
+                <VoiceInterview 
+                  onTranscript={handleVoiceTranscript}
+                  onConnectionChange={setIsConnected}
+                  hasConsented={hasConsented}
+                  onUserSpeechStart={() => {
+                    // placeholder for future UI actions when speech starts
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Messages Area */}
           <MessageList messages={messages} autoScroll={true} />
@@ -345,35 +434,38 @@ function InterviewContent() {
                   <Send className="w-5 h-5" />
                 </button>
               </div>
-            ) : (
-              // Voice Input
-              <div className="flex flex-col items-center gap-4">
-                <VoiceInterview 
-                  onTranscript={handleVoiceTranscript}
-                  onConnectionChange={setIsConnected}
-                />
-              </div>
-            )}
+            ) : null}
             
             {/* Complete Interview Button */}
-            {(coverage?.complete || messages.length > 10) && (
+            {isReadyForCompletion && (
               <div className="mt-4 flex justify-center">
                 <button
                   onClick={completeInterview}
-                  disabled={isProcessing}
+                  disabled={isCompleting}
                   className="px-6 py-3 bg-green-600 text-white rounded-xl shadow-lg hover:shadow-xl hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-base"
                 >
-                  Complete Interview & Generate Summary
+                  {isCompleting ? 'Processing...' : 'Complete Interview & Generate Summary'}
                   <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
             )}
+
+            {/* Manual End Interview with confirmation */}
+            <div className="mt-3 flex justify-center">
+              <button
+                onClick={handleManualComplete}
+                disabled={isCompleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm disabled:opacity-50"
+              >
+                End Interview
+              </button>
+            </div>
           </div>
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            <InterviewProgress messages={messages} onCoverageChange={setCoverage} />
+            <InterviewProgress messages={messages} onCoverageChange={() => {}} />
 
             {/* Instructions */}
             <div className="bg-blue-50 rounded-lg p-4">
@@ -396,7 +488,7 @@ function InterviewContent() {
                 You can request to speak with a human at any time:
               </p>
               <ul className="text-sm text-amber-800 space-y-1 mb-4">
-                <li>• Say "I want to speak to a human"</li>
+                <li>• Say &quot;I want to speak to a human&quot;</li>
                 <li>• Call 1-855-6-CONNECT</li>
               </ul>
               <Link

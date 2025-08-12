@@ -2,9 +2,16 @@ import { cleanupEmptyInterviews } from '@/app/actions/cleanup';
 import AppShell from '@/components/app-shell';
 import { Trash2 } from 'lucide-react';
 
+type CleanupResult = {
+  success: boolean;
+  deletedCount: number;
+  deletedSessions: string[];
+  error?: string;
+};
+
 export default async function CleanupPage() {
   // Automatically run cleanup on page load
-  let result;
+  let result: CleanupResult;
   try {
     result = await cleanupEmptyInterviews();
   } catch (error) {
@@ -50,7 +57,7 @@ export default async function CleanupPage() {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <h2 className="text-lg font-semibold text-red-900 mb-2">Cleanup Failed</h2>
               <p className="text-red-800">
-                Error: {(result as any).error || 'Unknown error occurred'}
+                Error: {result.error || 'Unknown error occurred'}
               </p>
             </div>
           )}

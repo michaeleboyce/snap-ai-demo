@@ -38,8 +38,11 @@ export async function updateInterview(sessionId: string, data: Partial<Interview
 export async function saveInterviewCheckpoint(sessionId: string, transcript: Array<{role: 'user' | 'assistant', content: string}>) {
   // Don't save empty sessions
   if (!transcript || transcript.length === 0) {
+    console.log('[saveInterviewCheckpoint] Skipping empty transcript for session:', sessionId);
     return null;
   }
+  
+  console.log('[saveInterviewCheckpoint] Saving checkpoint for session:', sessionId, 'transcript length:', transcript.length);
   
   // First find the interview
   const [interview] = await db
@@ -49,8 +52,14 @@ export async function saveInterviewCheckpoint(sessionId: string, transcript: Arr
     .limit(1);
   
   if (!interview) {
-    throw new Error('Interview not found');
+    console.error('[saveInterviewCheckpoint] Interview not found for sessionId:', sessionId);
+    // List all existing interviews for debugging
+    const allInterviews = await db.select({ sessionId: interviews.sessionId, id: interviews.id }).from(interviews).limit(10);
+    console.log('[saveInterviewCheckpoint] Existing interviews:', allInterviews);
+    throw new Error(`Interview not found for sessionId: ${sessionId}`);
   }
+  
+  console.log('[saveInterviewCheckpoint] Found interview:', interview.id, 'for session:', sessionId);
   
   // Analyze transcript to determine current section and completed sections
   const sectionAnalysis = analyzeTranscriptSections(transcript);
@@ -178,6 +187,37 @@ export async function abandonInterview(sessionId: string) {
       lastUpdated: new Date(),
     })
     .where(eq(interviews.sessionId, sessionId))
+    .returning();
+  
+  return updated;
+}
+
+export async function updateInterviewStatus(
+  interviewId: number, 
+  status: string, 
+  reviewNotes?: string,
+  denialReason?: string
+) {
+  const updateData: any = {
+    status,
+    lastUpdated: new Date(),
+  };
+
+  // Add review metadata
+  if (status === 'approved' || status === 'denied' || status === 'needs_info') {
+    updateData.reviewedAt = new Date();
+    if (reviewNotes) {
+      updateData.reviewNotes = reviewNotes;
+    }
+    if (denialReason && status === 'denied') {
+      updateData.denialReason = denialReason;
+    }
+  }
+
+  const [updated] = await db
+    .update(interviews)
+    .set(updateData)
+    .where(eq(interviews.id, interviewId))
     .returning();
   
   return updated;

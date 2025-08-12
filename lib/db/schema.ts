@@ -20,6 +20,10 @@ export const interviews = pgTable('interviews', {
   demoScenarioId: text('demo_scenario_id'), // Reference to demo scenario if applicable
   flags: json('flags').$type<string[]>().default([]), // Issues detected during interview
   exchangeCount: integer('exchange_count').default(0), // Number of message exchanges
+  // Review fields
+  reviewedAt: timestamp('reviewed_at'),
+  reviewNotes: text('review_notes'),
+  denialReason: text('denial_reason'),
 });
 
 export type Interview = typeof interviews.$inferSelect;

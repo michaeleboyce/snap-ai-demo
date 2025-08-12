@@ -20,7 +20,19 @@ export default function ConsentDialog({ onAccept, onDecline, language = 'en' }: 
     }
   };
 
-  const content = {
+  const content: Record<'en' | 'es', {
+    title: string;
+    subtitle: string;
+    intro: string;
+    benefits: { title: string; items: string[] };
+    howItWorks: { title: string; items: string[] };
+    privacy: { title: string; items: string[] };
+    optOut: { title: string; text: string; options: string[] };
+    terms: { title: string; content: string[]; scrollPrompt: string };
+    consent: { understand: string; agree: string; button: string; decline: string };
+    footer: string;
+    estimatedTime: string;
+  }> = {
     en: {
       title: 'Welcome to the SNAP Interview Assistant',
       subtitle: 'Connecticut Department of Social Services',
@@ -82,6 +94,68 @@ export default function ConsentDialog({ onAccept, onDecline, language = 'en' }: 
       },
       footer: 'By proceeding, you acknowledge that this is an AI-powered system and that your responses will be reviewed by human staff for final determination.',
       estimatedTime: 'Estimated interview time: 10-15 minutes'
+    },
+    es: {
+      title: 'Bienvenido al Asistente de Entrevista SNAP',
+      subtitle: 'Departamento de Servicios Sociales de Connecticut',
+      intro: 'Esta entrevista utiliza inteligencia artificial (IA) para ayudarle a solicitar beneficios SNAP. Antes de comenzar, revise la siguiente información importante.',
+      benefits: {
+        title: 'Beneficios del Asistente de IA',
+        items: [
+          'Disponible 24/7 para asistirle',
+          'Sin tiempos de espera: comience de inmediato',
+          'Recopilación de información consistente y precisa',
+          'Conversación privada y segura'
+        ]
+      },
+      howItWorks: {
+        title: 'Cómo Funciona',
+        items: [
+          'La IA le hará preguntas sobre su hogar e ingresos',
+          'Sus respuestas se registran y transcriben',
+          'Un trabajador revisa todas las solicitudes',
+          'Las decisiones finales las toman el personal calificado'
+        ]
+      },
+      privacy: {
+        title: 'Su Privacidad y Derechos',
+        items: [
+          'Toda la información se mantiene estrictamente confidencial',
+          'Los datos se cifran y se almacenan de forma segura',
+          'Puede solicitar ayuda humana en cualquier momento',
+          'Tiene derecho a revisar y corregir su información'
+        ]
+      },
+      optOut: {
+        title: 'Opciones para Hablar con un Humano',
+        text: 'Puede hablar con un representante humano en cualquier momento:',
+        options: [
+          'Diciendo "Quiero hablar con un humano" durante la entrevista',
+          'Llamando a nuestra línea de ayuda al 1-855-6-CONNECT',
+          'Visitando su oficina local del DSS'
+        ]
+      },
+      terms: {
+        title: 'Términos de Uso',
+        content: [
+          'Al continuar, usted reconoce y acepta lo siguiente:',
+          '1. Divulgación de IA: Entiende que interactuará con un sistema de inteligencia artificial diseñado para realizar entrevistas de elegibilidad SNAP.',
+          '2. Grabación y Garantía de Calidad: Su entrevista será grabada y transcrita para fines de calidad.',
+          '3. Revisión Humana: Todo lo recopilado será revisado por personal calificado.',
+          '4. Privacidad de Datos: Su información personal será protegida conforme a las leyes aplicables.',
+          '5. Participación Voluntaria: Puede solicitar una entrevista con un humano en cualquier momento.',
+          '6. Exactitud de la Información: Usted acepta proporcionar información precisa y completa.'
+        ],
+        scrollPrompt: 'Desplácese para leer todos los términos'
+      },
+      consent: {
+        understand: 'Entiendo que estoy hablando con un asistente de IA',
+        agree: 'Doy mi consentimiento para proceder con la entrevista asistida por IA',
+        button: 'Comenzar Entrevista',
+        decline: 'Solicitar Entrevista con Humano'
+      },
+      footer: 'Al continuar, reconoce que este es un sistema con IA y que sus respuestas serán revisadas por personal humano.',
+      estimatedTime: 'Tiempo estimado de entrevista: 10-15 minutos'
     }
   };
 

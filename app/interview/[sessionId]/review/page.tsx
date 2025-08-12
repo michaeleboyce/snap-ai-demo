@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { getInterview } from '@/app/actions/interviews';
 import AppShell from '@/components/app-shell';
 import Link from 'next/link';
-import { ArrowLeft, FileText, User, Calendar, Hash, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, User, Calendar, Hash, AlertCircle, Loader2 } from 'lucide-react';
 import InfoCard from '@/components/ui/info-card';
 import MessageList from '@/components/message-list';
 import type { Interview } from '@/lib/db/schema';
@@ -16,7 +16,8 @@ interface Message {
   timestamp: Date;
 }
 
-function renderSummaryValue(value: any): React.ReactNode {
+function renderSummaryValue(value: unknown): React.ReactNode {
+  // Narrow and render recursively
   if (value === null || value === undefined) {
     return 'Not provided';
   }
@@ -31,9 +32,10 @@ function renderSummaryValue(value: any): React.ReactNode {
     ));
   }
   if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
     return (
       <div className="ml-4 space-y-1">
-        {Object.entries(value).map(([key, val]) => (
+        {entries.map(([key, val]) => (
           <div key={key}>
             <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {renderSummaryValue(val)}
           </div>
@@ -200,14 +202,14 @@ export default function ReviewPage() {
           </div>
 
           {/* Summary */}
-          {interview.summary && (
+          {Boolean(interview.summary) && (
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Interview Summary</h2>
               <div className="space-y-4">
                 {typeof interview.summary === 'string' ? (
                   <p className="text-gray-700">{interview.summary}</p>
                 ) : (
-                  Object.entries(interview.summary as any).map(([key, value]) => {
+                  Object.entries(interview.summary as Record<string, unknown>).map(([key, value]) => {
                     if (key === 'timestamp' || key === 'totalMessages') return null;
                     return (
                       <div key={key} className="border-b pb-3 last:border-0">

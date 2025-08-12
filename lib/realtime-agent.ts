@@ -7,17 +7,23 @@ export const snapInterviewAgent = new RealtimeAgent({
   name: 'SNAP Interview Assistant',
   instructions: `You are a Connecticut SNAP benefits eligibility interviewer conducting a structured interview following Quality Assurance best practices.
 
-CRITICAL: When the session starts, IMMEDIATELY begin speaking with: "Hello! I'm here to help you with your SNAP benefits application. This interview will take about 10 to 15 minutes. Everything we discuss is confidential and will only be used to determine your eligibility. Let's start with who lives in your household. Can you tell me who buys and prepares food together in your home?"
+CRITICAL: When the session starts, IMMEDIATELY begin speaking. Provide a brief disclosure and ask for verbal consent BEFORE proceeding with the interview questions.
 
-DO NOT wait for the user to speak first. DO NOT say hello and wait. Immediately launch into the full introduction and first question as written above.
+Say this first, verbatim:
+"Hello! I'm here to help you with your SNAP benefits application. This interview will take about 10 to 15 minutes. Everything we discuss is confidential and will only be used to determine your eligibility. You can ask to speak to a human at any time by saying 'I want to speak to a human' or by calling 1-855-6-CONNECT. Before we begin, do you consent to speak with an AI assistant?"
+
+Then WAIT for a yes/no response:
+- If the applicant clearly consents (yes/okay/sure), acknowledge and continue: "Thank you. Let's start with who lives in your household. Can you tell me who buys and prepares food together in your home?"
+- If the applicant declines or asks for a human, follow OPT-OUT HANDLING below and end the conversation politely.
 
 VOICE INTERVIEW GUIDELINES:
-- Speak clearly and at a moderate pace
+- Speak clearly and at a normal or slightly fast pace.
 - Keep responses concise but complete
 - Use warm, professional tone
 - Pause after questions to allow responses
 - Use verbal acknowledgments like "I understand" or "Thank you"
 - If you don't catch something, politely ask them to repeat
+- If the applicant gives a generic on unspecific answer, ask them to provide more details first with non-leading questions then with leading questions, after 3 attempts, move on.
 
 INTERVIEW STRUCTURE:
 1. Introduction: Explain the process (10-15 minutes) and confidentiality
@@ -46,14 +52,16 @@ OPT-OUT HANDLING:
   1. Acknowledge their request immediately
   2. Say: "I understand you'd like to speak with a human interviewer. Please call 1-855-6-CONNECT to schedule your interview with a caseworker. Thank you for your time."
   3. End the conversation politely
+  4. If available, call the request_human tool with reason "Applicant requested human interview" so the UI can hand off gracefully.
 
+  5. If available, call the escalate_to_supervisor tool with reason "Applicant requested supervisor escalation" so the UI can hand off gracefully.
 REQUIRED COVERAGE POLICY:
 - You must ensure all required sections are fully covered: Household, Income, Expenses, Assets & Resources.
 - After each applicant response, if uncertain, call the assess_coverage tool with the known transcript so far.
 - If any required section is not covered, ask targeted, specific follow-up questions for ONLY the missing sections, prioritizing Assets & Resources when incomplete.
-- When you believe the interview is finished, call check_interview_complete with the current transcript. If it indicates complete and you have given a friendly closing (e.g., "Thank you for your time!"), then clearly say: "INTERVIEW_COMPLETE" and provide a brief verbal summary. Otherwise, continue asking for the missing required sections.
-
-Remember: You MUST start speaking immediately when connected. Do not wait for any input.`,
+  - When you believe the interview is finished, call check_interview_complete with the current transcript. If it indicates complete and you have given a friendly closing (e.g., "Thank you for your time!"), then provide a brief verbal summary and end the conversation. Do NOT say any special keywords or markers.
+  
+  Remember: You MUST start speaking immediately when connected. Do not wait for any input.`,
   handoffDescription: 'SNAP benefits interview specialist',
 });
 
@@ -67,9 +75,37 @@ const escalateToSupervisor = tool({
   }),
   needsApproval: false,
   execute: async ({ reason, complexityFactors }) => {
-    // In production, this would notify a supervisor
-    console.log('Escalating to supervisor:', { reason, complexityFactors });
-    return `Case has been flagged for supervisor review due to: ${reason}. The interview will continue, and a supervisor will review the complete transcript.`;
+    console.log('[Tool] escalate_to_supervisor: called with args →', { reason, complexityFactors });
+    const result = `Case has been flagged for supervisor review due to: ${reason}. The interview will continue, and a supervisor will review the complete transcript.`;
+    console.log('[Tool] escalate_to_supervisor: result →', result);
+    return result;
+  },
+});
+
+// Tool for requesting handoff to a human representative (signals the UI)
+const requestHuman = tool({
+  name: 'request_human',
+  description: 'Signal the UI to hand off to a human interviewer (polite closing + stop recording + navigate).',
+  parameters: z.object({
+    reason: z.string().describe('Reason for handoff'),
+  }),
+  needsApproval: false,
+  execute: async ({ reason }: { reason: string }) => {
+    console.log('[Tool] request_human: called with args →', { reason });
+    try {
+      if (typeof window !== 'undefined') {
+        const evt = new CustomEvent('interview:request_human');
+        window.dispatchEvent(evt);
+        console.log('[Tool] request_human: dispatched interview:request_human');
+      } else {
+        console.log('[Tool] request_human: window not available; UI will not receive event');
+      }
+    } catch (err) {
+      console.error('[Tool] request_human: error dispatching event', err);
+    }
+    const result = `Human handoff requested (${reason})`;
+    console.log('[Tool] request_human: result →', result);
+    return result;
   },
 });
 
@@ -85,6 +121,13 @@ const calculateEstimatedBenefit = tool({
     hasDisabled: z.boolean(),
   }),
   execute: async ({ householdSize, monthlyIncome, monthlyRent, hasElderly, hasDisabled }) => {
+    console.log('[Tool] calculate_estimated_benefit: called with args →', {
+      householdSize,
+      monthlyIncome,
+      monthlyRent,
+      hasElderly,
+      hasDisabled,
+    });
     // Simplified calculation for demo purposes
     // Real calculation would use FNS tables and deduction rules
     const grossIncomeLimit = {
@@ -98,7 +141,9 @@ const calculateEstimatedBenefit = tool({
     }[Math.min(householdSize, 8)] || 1756;
 
     if (monthlyIncome > grossIncomeLimit * (hasElderly || hasDisabled ? 2 : 1.3)) {
-      return 'Based on the information provided, the household may not qualify for SNAP benefits due to income limits. However, a full review is needed.';
+      const outOfRange = 'Based on the information provided, the household may not qualify for SNAP benefits due to income limits. However, a full review is needed.';
+      console.log('[Tool] calculate_estimated_benefit: result →', outOfRange);
+      return outOfRange;
     }
 
     // Very rough estimate
@@ -106,12 +151,14 @@ const calculateEstimatedBenefit = tool({
     const thirtyPercentNet = netIncome * 0.3;
     const estimatedBenefit = Math.max(20, Math.min(maxBenefit - thirtyPercentNet, maxBenefit));
 
-    return `Based on preliminary information, the household might qualify for approximately $${Math.round(estimatedBenefit)} per month in SNAP benefits. This is just an estimate - the actual amount will be determined after full verification.`;
+    const result = `Based on preliminary information, the household might qualify for approximately $${Math.round(estimatedBenefit)} per month in SNAP benefits. This is just an estimate - the actual amount will be determined after full verification.`;
+    console.log('[Tool] calculate_estimated_benefit: result →', result);
+    return result;
   },
 });
 
 // Add tools to the agent
-snapInterviewAgent.tools = [escalateToSupervisor, calculateEstimatedBenefit];
+snapInterviewAgent.tools = [escalateToSupervisor, calculateEstimatedBenefit, requestHuman];
 
 // Tool: assess coverage of transcript for required sections
 const assessCoverage = tool({
@@ -121,6 +168,7 @@ const assessCoverage = tool({
     transcript: z.string().describe('The full transcript so far'),
   }),
   execute: async ({ transcript }) => {
+    console.log('[Tool] assess_coverage: called with args →', { transcriptPreview: transcript.slice(0, 200) + (transcript.length > 200 ? '…' : '') });
     const systemPrompt = `You are assessing a SNAP interview transcript to determine whether key sections were covered.
 Return ONLY strict JSON with booleans for each section id.
 
@@ -141,6 +189,7 @@ Output JSON:
       responseFormat: { type: 'json_object' },
       maxCompletionTokens: 300,
     });
+    console.log('[Tool] assess_coverage: result →', content ?? '{}');
     return content ?? '{}';
   },
 });
@@ -159,6 +208,7 @@ const checkInterviewComplete = tool({
     transcript: z.string().describe('The full transcript so far'),
   }),
   execute: async ({ transcript }) => {
+    console.log('[Tool] check_interview_complete: called with args →', { transcriptPreview: transcript.slice(0, 200) + (transcript.length > 200 ? '…' : '') });
     // First: assess coverage
     const covSystem = `Return ONLY strict JSON {"sections":{"household":boolean,"income":boolean,"expenses":boolean,"assets":boolean,"special":boolean}}`;
     const { content: covContent } = await chatWithFallback({
@@ -180,7 +230,7 @@ const checkInterviewComplete = tool({
     const requiredCovered = !!sections?.household && !!sections?.income && !!sections?.expenses && !!sections?.assets;
     const hadClosing = /thank you for your time|that is all for now|we will get back to you soon|thank you so much/i.test(transcript);
 
-    return JSON.stringify({
+    const result = JSON.stringify({
       complete: requiredCovered && hadClosing,
       sections: {
         household: !!sections?.household,
@@ -190,12 +240,15 @@ const checkInterviewComplete = tool({
         special: !!sections?.special,
       },
     });
+    console.log('[Tool] check_interview_complete: result →', result);
+    return result;
   },
 });
 
 snapInterviewAgent.tools = [
   escalateToSupervisor,
   calculateEstimatedBenefit,
+  requestHuman,
   assessCoverage,
   checkInterviewComplete,
 ];

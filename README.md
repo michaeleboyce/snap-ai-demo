@@ -160,6 +160,56 @@ pnpm run db:seed  # Add sample data (optional)
 - [ ] Export evaluation results (JSON/CSV)
 - [ ] Create performance benchmarks
 
+#### 12. Component Architecture & Consistency Refactor
+
+- [ ] Component inventory and audit
+  - [ ] Catalog current components and pages: `AppShell`, `InfoCard`, `ui/dialog`, `ConsentDialog`, `VoiceInterview`, `InterviewProgress`, `MessageList`, summary components (`components/summary/*`), `Interview History`, `Review`, `Staff Review` pages
+  - [ ] Identify duplicate patterns (cards, banners, badges, status pills, dialogs, section headers)
+
+- [ ] Establish UI primitives library (`components/ui/*`)
+  - [ ] `Button`, `Card` (header/body/footer slots), `Alert` (info/success/warning/error variants), `Badge/StatusPill`, `Dialog/Modal`, `Progress`, `Stat` (label/value), `SectionHeader`
+  - [ ] Migrate `InfoCard` to use `Card` + `Alert` variants and deprecate custom ad-hoc banners
+  - [ ] Consolidate all modals on top of base `Dialog` (headless, accessible)
+
+- [ ] Consolidate dialogs/modals
+  - [ ] Refactor `ConsentDialog` to use base `Dialog`
+  - [ ] Extract generic `ConfirmDialog` and use it for “End Interview” confirmation
+  - [ ] Create `ReviewDetailDialog` as a composition over `Dialog` for Staff Review
+
+- [ ] Create renderless logic hooks (separate logic from view)
+  - [ ] `useVoiceSession` wrapper around Realtime/VoicePipeline: lifecycle events, turn detection, idle handling, interruptions
+  - [ ] `useInterviewTranscript` for message normalization, checkpoint saves, resume
+  - [ ] `useCoverage` for debounced coverage evaluation and errors
+  - [ ] `useCompletion` to unify completion detection: agent signal (INTERVIEW_COMPLETE) + coverage fallback + manual end
+
+- [ ] Event bus and constants
+  - [ ] Define custom events and channels in `lib/events.ts` (e.g., `interview:complete`, `interview:idle-warning`, `interview:idle-end`)
+  - [ ] Replace ad-hoc window events with typed helpers
+
+- [ ] Types and schemas
+  - [ ] Centralize shared types in `types/` (`InterviewMessage`, `CoverageSections`, `InterviewSummary`, `InterviewStatus`)
+  - [ ] Remove `any` usages; ensure `summary` is a typed JSON object across API/UI
+  - [ ] Align server actions and pages on the same DTOs
+
+- [ ] Layouts and composition
+  - [ ] Introduce `PageLayout` with content/sidebar slots; apply to `Interview`, `Review`, `History`, `Staff Review`
+  - [ ] Extract `StatusBadge` and reuse across `History`, `Review`, `Staff Review`
+  - [ ] Unify “demo mode” indicators and contextual banners
+
+- [ ] i18n and copy centralization
+  - [ ] Move user-facing strings to a simple i18n setup (prep for Spanish)
+  - [ ] Keep consent/disclosure copy in dedicated modules with translations
+
+- [ ] DevX & quality
+  - [ ] Add Storybook for primitives and complex components (`VoiceInterview`, `InterviewProgress`, dialogs)
+  - [ ] Strengthen ESLint/TS rules (ban `any`, exhaustive-deps best practices) and fix offenders
+  - [ ] Add Plop or simple templates for generating new components/hooks aligned with conventions
+
+- [ ] Migration plan
+  - [ ] Phase 1: Build primitives/hooks; adopt in `Interview` page
+  - [ ] Phase 2: Migrate `Staff Review`, `Review`, `History`
+  - [ ] Phase 3: Remove deprecated components and duplicate patterns
+
 ### 🟢 Nice to Have (Demo Enhancements)
 
 #### 7. Enhanced Demo Features

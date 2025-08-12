@@ -66,11 +66,11 @@ export async function POST(request: Request) {
       },
     };
 
-    // Save enhanced summary to database
+    // Save enhanced summary to database (store as JSON object, not string)
     await db
       .update(interviews)
       .set({
-        summary: JSON.stringify(enhancedSummary),
+        summary: enhancedSummary as unknown as Record<string, unknown>,
         status: 'completed',
         completedAt: new Date(),
       })
