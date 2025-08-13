@@ -35,7 +35,7 @@ export default function ConsentDialog({ onAccept, onDecline, language = 'en' }: 
   }> = {
     en: {
       title: 'Welcome to the SNAP Interview Assistant',
-      subtitle: 'Connecticut Department of Social Services',
+      subtitle: 'Fake Health and Human Services Department',
       intro: 'This interview uses artificial intelligence (AI) to help you apply for SNAP benefits. Before we begin, please review the following important information.',
       benefits: {
         title: 'Benefits of AI Assistant',
@@ -69,17 +69,17 @@ export default function ConsentDialog({ onAccept, onDecline, language = 'en' }: 
         text: 'You can speak to a human representative at any time by:',
         options: [
           'Saying "I want to speak to a human" during the interview',
-          'Calling our helpline at 1-855-6-CONNECT',
-          'Visiting your local DSS office'
+          'Calling our helpline at 1-800-555-SNAP',
+          'Visiting your local Human Services Department office'
         ]
       },
       terms: {
         title: 'Terms of Use',
         content: [
           'By proceeding with this AI-assisted interview, you acknowledge and agree to the following:',
-          '1. AI Assistant Disclosure: You understand that you will be interacting with an artificial intelligence system designed to conduct SNAP eligibility interviews. This AI assistant is not a human but has been trained to follow Connecticut DSS guidelines.',
+          '1. AI Assistant Disclosure: You understand that you will be interacting with an artificial intelligence system designed to conduct SNAP eligibility interviews. This AI assistant is not a human but has been trained to follow State of Fake State guidelines.',
           '2. Recording & Quality Assurance: Your interview will be recorded and transcribed for quality assurance purposes. These recordings help ensure accuracy and improve our services.',
-          '3. Human Review: All information collected will be reviewed by qualified DSS staff who will make the final eligibility determination. The AI does not make decisions about your benefits.',
+          '3. Human Review: All information collected will be reviewed by qualified Human Services Department staff who will make the final eligibility determination. The AI does not make decisions about your benefits.',
           '4. Data Privacy: Your personal information will be protected according to state and federal privacy laws. We will not share your information except as required for benefit administration.',
           '5. Voluntary Participation: Using the AI assistant is voluntary. You may request a traditional interview with a human caseworker at any time.',
           '6. Accuracy of Information: You agree to provide accurate and complete information. Providing false information may affect your eligibility and could result in penalties.'
@@ -97,7 +97,7 @@ export default function ConsentDialog({ onAccept, onDecline, language = 'en' }: 
     },
     es: {
       title: 'Bienvenido al Asistente de Entrevista SNAP',
-      subtitle: 'Departamento de Servicios Sociales de Connecticut',
+      subtitle: 'Departamento de Servicios Sociales de Fake State',
       intro: 'Esta entrevista utiliza inteligencia artificial (IA) para ayudarle a solicitar beneficios SNAP. Antes de comenzar, revise la siguiente información importante.',
       benefits: {
         title: 'Beneficios del Asistente de IA',
@@ -131,8 +131,8 @@ export default function ConsentDialog({ onAccept, onDecline, language = 'en' }: 
         text: 'Puede hablar con un representante humano en cualquier momento:',
         options: [
           'Diciendo "Quiero hablar con un humano" durante la entrevista',
-          'Llamando a nuestra línea de ayuda al 1-855-6-CONNECT',
-          'Visitando su oficina local del DSS'
+          'Llamando a nuestra línea de ayuda al 1-800-555-SNAP',
+          'Visitando su oficina local del Human Services Department'
         ]
       },
       terms: {
@@ -273,7 +273,7 @@ export default function ConsentDialog({ onAccept, onDecline, language = 'en' }: 
             </ul>
             <div className="mt-3 flex items-center gap-2">
               <Phone className="w-4 h-4 text-amber-700" />
-              <span className="font-semibold text-amber-900">1-855-6-CONNECT</span>
+              <span className="font-semibold text-amber-900">1-800-555-SNAP</span>
             </div>
           </div>
 

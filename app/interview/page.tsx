@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Send, Loader2, ArrowRight, AlertCircle, Phone, CheckCircle } from 'lucide-react';
 import { generateSessionId } from '@/lib/utils';
@@ -9,7 +9,7 @@ import MessageList from '@/components/message-list';
 import InterviewProgress from '@/components/interview-progress';
 import ConsentDialog from '@/components/consent-dialog';
 import dynamic from 'next/dynamic';
-import { createInterview, getInterview, saveInterviewCheckpoint, completeInterview as completeInterviewAction } from '@/app/actions/interviews';
+import { createInterview, getInterview, saveInterviewCheckpoint } from '@/app/actions/interviews';
 import { getDemoScenario } from '@/lib/demo-scenarios';
 import Link from 'next/link';
 import { getCompletionPercentage } from '@/lib/interview-completion';
@@ -389,6 +389,7 @@ function InterviewContent() {
                   onUserSpeechStart={() => {
                     // placeholder for future UI actions when speech starts
                   }}
+                  initialMessages={isDemo ? messages.map(m => ({ role: m.role, content: m.content })) : undefined}
                 />
               </div>
             </div>
@@ -489,7 +490,7 @@ function InterviewContent() {
               </p>
               <ul className="text-sm text-amber-800 space-y-1 mb-4">
                 <li>• Say &quot;I want to speak to a human&quot;</li>
-                <li>• Call 1-855-6-CONNECT</li>
+                <li>• Call 1-800-555-SNAP</li>
               </ul>
               <Link
                 href="/contact-human"

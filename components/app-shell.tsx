@@ -53,7 +53,7 @@ export default function AppShell({ children, showDemoBadge = true, rightSlot }: 
         {children}
       </main>
       <footer className="border-t mt-16 py-8 text-center text-xs text-slate-500">
-        <p>Created by US Digital Response for Connecticut Department of Social Services</p>
+        <p>Created by US Digital Response for Fake Health and Human Services Department</p>
         <p className="mt-1">SNAP AI Interview Assistant Prototype</p>
       </footer>
     </div>

@@ -114,19 +114,51 @@ export function useCompletion({ sessionId, messages, coverage, hasConsented }: U
         await saveInterviewCheckpoint(sessionId, transcriptData);
       }
       
-      // Generate summary data
-      const userMessageCount = messages.filter(m => m.role === 'user').length;
-      const summary = {
-        totalMessages: messages.length,
-        exchangeCount: userMessageCount,
-        completedSections: Object.entries(coverage || {})
-          .filter(([k, v]) => v && k !== 'complete')
-          .map(([k]) => k),
-        timestamp: new Date().toISOString(),
-      };
+      // Generate AI-powered summary using transcript
+      const transcript = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
       
-      // Mark interview as complete
-      await completeInterviewAction(sessionId, summary);
+      try {
+        // Call the summary generation API
+        const response = await fetch('/api/generate-summary-v2', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            transcript,
+          }),
+        });
+        
+        if (response.ok) {
+          const { summary } = await response.json();
+          // Mark interview as complete with AI-generated summary
+          await completeInterviewAction(sessionId, summary);
+        } else {
+          // Fallback to basic summary if AI generation fails
+          const userMessageCount = messages.filter(m => m.role === 'user').length;
+          const basicSummary = {
+            totalMessages: messages.length,
+            exchangeCount: userMessageCount,
+            completedSections: Object.entries(coverage || {})
+              .filter(([k, v]) => v && k !== 'complete')
+              .map(([k]) => k),
+            timestamp: new Date().toISOString(),
+          };
+          await completeInterviewAction(sessionId, basicSummary);
+        }
+      } catch (error) {
+        console.error('Error generating AI summary:', error);
+        // Fallback to basic summary
+        const userMessageCount = messages.filter(m => m.role === 'user').length;
+        const basicSummary = {
+          totalMessages: messages.length,
+          exchangeCount: userMessageCount,
+          completedSections: Object.entries(coverage || {})
+            .filter(([k, v]) => v && k !== 'complete')
+            .map(([k]) => k),
+          timestamp: new Date().toISOString(),
+        };
+        await completeInterviewAction(sessionId, basicSummary);
+      }
       
       // Navigate to summary page
       router.push(`/summary/${sessionId}`);

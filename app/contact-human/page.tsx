@@ -33,9 +33,9 @@ export default function ContactHumanPage() {
               </div>
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Call Us</h2>
-                <p className="text-2xl font-bold text-blue-600 mb-2">1-855-6-CONNECT</p>
+                <p className="text-2xl font-bold text-blue-600 mb-2">1-800-555-SNAP</p>
                 <p className="text-sm text-gray-600">
-                  (1-855-626-6632)
+                  (1-800-555-7627)
                 </p>
                 <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
                   <Clock className="w-4 h-4" />
@@ -54,12 +54,10 @@ export default function ContactHumanPage() {
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Visit an Office</h2>
                 <p className="text-gray-700 mb-3">
-                  Find your nearest DSS office for in-person assistance
+                  Find your nearest office for in-person assistance
                 </p>
                 <a
-                  href="https://portal.ct.gov/DSS/Field-Offices/Field-Office-Listings"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
                 >
                   Find Office Locations
@@ -81,7 +79,7 @@ export default function ContactHumanPage() {
                   Send us your questions and we&apos;ll respond within 1-2 business days
                 </p>
                 <a
-                  href="mailto:dss.co@ct.gov"
+                  href="mailto:hhhs@state.fake.gov"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
                 >
                   Send Email

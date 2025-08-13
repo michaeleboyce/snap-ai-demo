@@ -1,7 +1,7 @@
 # AI Architecture Documentation - SNAP Interview Assistant
 
 ## Executive Summary
-This document details the AI architecture of the Connecticut SNAP Interview Assistant, built using OpenAI's Agents SDK for TypeScript. The system implements a voice-enabled conversational agent that conducts structured SNAP benefits eligibility interviews following Connecticut DSS Quality Assurance best practices.
+This document details the AI architecture of the Fake State SNAP Interview Assistant, built using OpenAI's Agents SDK for TypeScript. The system implements a voice-enabled conversational agent that conducts structured SNAP benefits eligibility interviews following Fake State DSS Quality Assurance best practices.
 
 ## Architecture Overview
 
@@ -304,10 +304,10 @@ function analyzeProgress(history: ConversationHistory): InterviewProgress {
 - Automatic clarification prompts
 - Escalation for complex cases
 
-### 9. Connecticut DSS Alignment
+### 9. Fake State Department of Human Services Alignment
 
 #### QA Methodology Implementation
-The agent follows Connecticut's Quality Assurance interview structure:
+The agent follows Fake State's Quality Assurance interview structure:
 
 1. **Standardized Question Flow**: Consistent ordering and phrasing
 2. **Complete Information Gathering**: All required topics covered

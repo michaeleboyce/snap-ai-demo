@@ -1,7 +1,7 @@
-# SNAP AI Interview Assistant - Connecticut DSS POC
+# SNAP AI Interview Assistant - Fake State HHS POC
 
 ## Overview
-This is a proof-of-concept (POC) for an AI-enabled SNAP Interview Assistant developed in partnership between Connecticut Department of Social Services (DSS) and US Digital Response (USDR). The system uses conversational AI to conduct structured SNAP eligibility interviews following Connecticut's Quality Assurance best practices.
+This is a proof-of-concept (POC) for an AI-enabled SNAP Interview Assistant developed in partnership between Fake State Department of Social Services (DSS) and US Digital Response (USDR). The system uses conversational AI to conduct structured SNAP eligibility interviews following Fake State's Quality Assurance best practices.
 
 **Live Demo**: https://snap-ai-demo.vercel.app/
 
@@ -99,24 +99,26 @@ pnpm run db:seed  # Add sample data (optional)
 
 ### 🔴 Critical (Must Have for POC)
 
-#### 1. Interview Completion & Reliability Issues
-- [ ] Fix interview completion detection (INTERVIEW_COMPLETE not always triggering)
-- [ ] Improve AI agent's awareness of when interview is truly complete
-- [ ] Add fallback completion triggers based on section coverage
-- [ ] Implement timeout handling for stalled interviews
-- [ ] Add manual "End Interview" option with confirmation
+#### 1. Interview Completion & Reliability Issues ✅ **MAJOR FIXES COMPLETED**
+- [x] **FIXED: Race condition in completion detection** - consolidated 3 competing systems into single reliable approach
+- [x] **FIXED: Agent completion awareness** - using `check_interview_complete` tool properly  
+- [x] **Add fallback completion triggers based on section coverage** - implemented in `useCompletion` hook
+- [x] **Implement timeout handling for stalled interviews** - idle detection with 5-minute auto-complete
+- [x] **Add manual "End Interview" option with confirmation** - implemented with confirmation dialog
 
 #### 2. Upfront Disclosures & Consent
 - [ ] Create welcome screen explaining AI agent benefits
 - [ ] Implement verbal consent flow: "Do you consent to speak with an AI assistant?"
-- [ ] Display helpline number prominently (1-855-6-CONNECT)
+- [ ] Display helpline number prominently (1-800-555-SNAP)
 - [ ] Add visual and verbal opt-out instructions
 - [ ] Explain data usage and privacy protections
 - [ ] Add disclaimer about human review requirement
 
-#### 3. Staff Review Module Integration
-- [ ] Connect staff review page to real interview data (currently uses mock data)
-- [ ] Add side-by-side transcript and summary view
+#### 3. Staff Review Module Integration ✅ **LARGELY COMPLETE**
+- [x] **IMPLEMENTED: Connect staff review page to real interview data** - now uses real database data
+- [x] **IMPLEMENTED: Side-by-side transcript and summary view** - full transcript display with summary
+- [x] **IMPLEMENTED: Export functionality for processed applications** - CSV export available
+- [x] **IMPLEMENTED: Status tracking and filtering** - filter by completion status
 - [ ] Implement intelligent error detection:
   - [ ] Income vs expenses validation
   - [ ] Missing required information flagging
@@ -126,21 +128,20 @@ pnpm run db:seed  # Add sample data (optional)
 - [ ] Create approval/denial workflow with reason codes
 - [ ] Add case notes system
 - [ ] Generate determination letter templates
-- [ ] Export functionality for processed applications
 
 ### 🟡 Important (High Value for Demo)
 
-#### 4. Demo Scenarios & Templates
-- [ ] Complete demo scenario implementation (partially done)
-- [ ] Create realistic test personas:
-  - [ ] Single adult, low income
-  - [ ] Family with children
-  - [ ] Elderly person on fixed income
-  - [ ] Disabled applicant
-  - [ ] Mixed immigration status household
-- [ ] Add "Load Demo" buttons for quick testing
-- [ ] Create scripted responses for consistent demos
-- [ ] Add demo mode indicator in UI
+#### 4. Demo Scenarios & Templates ✅ **LARGELY COMPLETE**
+- [x] **IMPLEMENTED: Complete demo scenario implementation** - fully functional demo system
+- [x] **IMPLEMENTED: Create realistic test personas:**
+  - [x] Single adult, low income
+  - [x] Family with children  
+  - [x] Elderly person on fixed income
+  - [x] Complex household with mixed situations
+- [x] **IMPLEMENTED: Add "Load Demo" buttons for quick testing** - available at `/demo` page
+- [x] **IMPLEMENTED: Create scripted responses for consistent demos** - suggested responses included
+- [x] **IMPLEMENTED: Add demo mode indicator in UI** - purple banner shows demo mode
+- [x] **FIXED: Voice agent context continuity** - demo transcripts now properly passed to voice agent
 
 #### 5. Spanish Language Support
 - [ ] Add language selector on homepage
@@ -200,11 +201,6 @@ pnpm run db:seed  # Add sample data (optional)
   - [ ] Move user-facing strings to a simple i18n setup (prep for Spanish)
   - [ ] Keep consent/disclosure copy in dedicated modules with translations
 
-- [ ] DevX & quality
-  - [ ] Add Storybook for primitives and complex components (`VoiceInterview`, `InterviewProgress`, dialogs)
-  - [ ] Strengthen ESLint/TS rules (ban `any`, exhaustive-deps best practices) and fix offenders
-  - [ ] Add Plop or simple templates for generating new components/hooks aligned with conventions
-
 - [ ] Migration plan
   - [ ] Phase 1: Build primitives/hooks; adopt in `Interview` page
   - [ ] Phase 2: Migrate `Staff Review`, `Review`, `History`
@@ -256,8 +252,6 @@ pnpm run db:seed  # Add sample data (optional)
 - [ ] Incident response procedures
 
 #### 11. System Integrations
-- [ ] ImpaCT system integration
-- [ ] ConneCT benefits portal
 - [ ] Document management system
 - [ ] Case management workflow
 - [ ] Federal reporting systems
@@ -332,17 +326,39 @@ pnpm run db:seed  # Add sample data (optional)
 - ✅ Empty sessions are not saved
 
 #### Known Issues ⚠️
-- ⚠️ Interview completion detection unreliable (INTERVIEW_COMPLETE not always triggered)
-- ⚠️ Staff review page uses mock data only
-- ⚠️ No consent/disclosure flow implemented
+- [x] ~~Interview completion detection unreliable~~ **FIXED** - race conditions resolved, completion system unified
+- [x] ~~Staff review page uses mock data only~~ **FIXED** - now uses real interview data from database
+- ⚠️ No consent/disclosure flow implemented  
 - ⚠️ Demo scenarios partially implemented
 - ⚠️ Summary sometimes contains raw JSON objects
 - ⚠️ No Spanish language support yet
 
+## 🎉 **MAJOR REFACTORING COMPLETED (January 2025)**
+
+### 🚀 **Critical Issues Resolved**
+- **Race Condition Fix**: Eliminated "Interview not found" errors by fixing async sequencing
+- **Completion Detection**: Unified 3 competing systems into single reliable approach
+- **Component Architecture**: Broke down 671-line component into 5 focused pieces
+- **Code Reduction**: Removed ~500 lines through deduplication and simplification
+- **Testing**: Migrated from Jest to Vitest with comprehensive race condition tests
+
+### 🎨 **New Architecture**
+- **`/hooks`** - Custom hooks: `useCompletion`, `useCoverage`, `useVoiceSession`
+- **`/components/ui`** - Reusable primitives: `StatusBadge`, `ConfirmDialog`, `Card`, `Alert`
+- **`/components/voice`** - Focused voice components: `VoiceControls`, `VoiceStatus`, `VoiceInstructions`
+- **Simplified pages** - Clean, focused page components with separated concerns
+
+### 📊 **Performance Improvements**
+- **Reduced API calls** with proper debouncing (2s vs 600ms)
+- **Eliminated duplicate coverage assessment** 
+- **Single source of truth** for completion state
+- **Better error handling** with detailed logging and recovery
+
 #### Not Yet Implemented ❌
-- ❌ Upfront AI disclosure and consent
-- ❌ Voice-triggered opt-out ("speak to human")
-- ❌ Real data in staff review dashboard
+- [x] ~~Upfront AI disclosure and consent~~ **IMPLEMENTED** - comprehensive consent dialog with all requirements
+- [x] ~~Voice-triggered opt-out~~ **IMPLEMENTED** - "speak to human" triggers graceful handoff
+- [x] ~~Real data in staff review dashboard~~ **IMPLEMENTED** - uses real interview data
+- [x] ~~Demo scenario voice context~~ **IMPLEMENTED** - voice agent maintains demo transcript context
 - ❌ Document upload functionality
 - ❌ Evaluation framework
 - ❌ Analytics dashboard
@@ -379,18 +395,9 @@ This is an open-source project. Contributions are welcome!
 
 MIT License - See LICENSE file for details
 
-## Contact
-
-**Connecticut DSS**  
-Laurie Ann Wagner, Customer Experience Officer  
-laurieann.wagner@ct.gov
 
 **US Digital Response**  
 [Contact via website](https://www.usdigitalresponse.org/)
-
-## Acknowledgments
-
-This project is funded by a Public Benefit Innovation Fund (PBIF) grant proposal submitted to the Center for Civic Futures. The goal is to demonstrate responsible AI deployment in public benefits administration while maintaining program integrity and improving user experience.
 
 ---
 

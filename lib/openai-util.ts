@@ -32,14 +32,14 @@ export interface ChatWithFallbackParams {
 
 export async function chatWithFallback({
   messages,
-  model = 'gpt-5',
-  fallbackModel = 'gpt-4.1',
+  model = 'gpt-4-turbo-preview',
+  fallbackModel = 'gpt-4',
   temperature,
   maxCompletionTokens,
   responseFormat,
 }: ChatWithFallbackParams): Promise<{ content: string; modelUsed: string }> {
-  const primaryAllowsTemperature = !/^gpt-5(\b|:|$)/i.test(model);
-  const fallbackAllowsTemperature = !/^gpt-5(\b|:|$)/i.test(fallbackModel);
+  const primaryAllowsTemperature = true; // Both gpt-4 models support temperature
+  const fallbackAllowsTemperature = true;
   try {
     const completion = await getOpenAI().chat.completions.create({
       model,

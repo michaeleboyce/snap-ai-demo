@@ -12,6 +12,7 @@ interface VoiceInterviewProps {
   onConnectionChange: (connected: boolean) => void;
   hasConsented?: boolean;
   onUserSpeechStart?: () => void;
+  initialMessages?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 interface TranscriptBuffer {
@@ -19,7 +20,7 @@ interface TranscriptBuffer {
   assistant: string;
 }
 
-export default function VoiceInterview({ onTranscript, onConnectionChange, hasConsented = false, onUserSpeechStart }: VoiceInterviewProps) {
+export default function VoiceInterview({ onTranscript, onConnectionChange, hasConsented = false, onUserSpeechStart, initialMessages }: VoiceInterviewProps) {
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [isMuted, setIsMuted] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
@@ -46,11 +47,12 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, hasCo
     } else {
       setShowConsent(true);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasConsented]);
 
   const handleConsentDecline = useCallback(() => {
     setShowConsent(false);
-    alert('Please call 1-855-6-CONNECT to schedule a human interview.');
+    alert('Please call 1-800-555-SNAP to schedule a human interview.');
   }, []);
 
   const handleConnect = useCallback(async () => {
@@ -215,6 +217,24 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, hasCo
       setIsProcessing(false);
       onConnectionChange(true);
 
+      // Add initial messages from demo scenario if provided
+      if (initialMessages && initialMessages.length > 0) {
+        console.log('[VoiceInterview] Adding initial messages from demo scenario:', initialMessages.length);
+        const transport = session.transport as { send?: (data: unknown) => void };
+        if (transport && transport.send) {
+          for (const message of initialMessages) {
+            transport.send({
+              type: 'conversation.item.create',
+              item: {
+                type: 'message',
+                role: message.role,
+                content: [{ type: 'input_text', text: message.content }]
+              }
+            });
+          }
+        }
+      }
+
       // Trigger the agent to start speaking by creating an initial response (one-time only)
       if (!hasTriggeredRef.current) {
         hasTriggeredRef.current = true;
@@ -224,14 +244,15 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, hasCo
           console.log('[VoiceInterview] Attempting to trigger initial response...');
           
           // Method 1: Try using session's built-in methods if available
-          if ((session as any).createResponse) {
+          const sessionWithMethod = session as { createResponse?: () => void };
+          if (sessionWithMethod.createResponse) {
             console.log('[VoiceInterview] Using session.createResponse()');
-            (session as any).createResponse();
+            sessionWithMethod.createResponse();
             return true;
           }
           
           // Method 2: Try using the transport directly
-          const transport = session.transport as any;
+          const transport = session.transport as { send?: (data: unknown) => void };
           if (transport && transport.send) {
             console.log('[VoiceInterview] Using transport.send()');
             transport.send({
@@ -277,7 +298,7 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, hasCo
         kickstartTimeoutRef.current = window.setTimeout(() => {
           if (!isAISpeaking && sessionRef.current) {
             console.log('[VoiceInterview] Forcing initial response (fallback after 2s)');
-            const transport = sessionRef.current.transport as any;
+            const transport = sessionRef.current.transport as { send?: (data: unknown) => void };
             if (transport && transport.send) {
               // Send a simple user message to trigger the agent
               transport.send({
@@ -303,7 +324,8 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, hasCo
       setIsProcessing(false);
       onConnectionChange(false);
     }
-  }, [connectionState, onTranscript, onConnectionChange, isAISpeaking]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps  
+  }, [connectionState, onTranscript, onConnectionChange, isAISpeaking, initialMessages]);
 
   const handleConsentAccept = useCallback(() => {
     setShowConsent(false);
@@ -334,8 +356,8 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, hasCo
           try {
             const candidateKeys = ['localStream', 'microphoneStream', 'inputStream', 'remoteStream', 'outputMediaStream'];
             for (const key of candidateKeys) {
-              const maybeStream = (transport as any)[key];
-              if (maybeStream && typeof maybeStream.getTracks === 'function') {
+              const maybeStream = (transport as Record<string, unknown>)[key];
+              if (maybeStream && typeof (maybeStream as { getTracks?: () => MediaStreamTrack[] }).getTracks === 'function') {
                 (maybeStream as MediaStream).getTracks().forEach((track: MediaStreamTrack) => {
                   track.stop();
                   console.log('[VoiceInterview] Stopped media track from', key, ':', track.kind);
@@ -514,6 +536,7 @@ export default function VoiceInterview({ onTranscript, onConnectionChange, hasCo
       window.removeEventListener('interview:request_human', handleHandoffRequest);
       idleIntervalCleanup();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run on mount/unmount
 
   return (

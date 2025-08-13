@@ -8,7 +8,7 @@ export default function AboutPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-3">About this Project</h1>
         <p className="text-gray-700 mb-6">
           This is a proof-of-concept SNAP Interview Assistant built by US Digital Response in partnership with
-          the Connecticut Department of Social Services. It demonstrates how conversational AI can help conduct
+          the Fake Health and Human Services Department. It demonstrates how conversational AI can help conduct
           structured eligibility interviews while preserving human-in-the-loop decision making.
         </p>
 

@@ -332,7 +332,7 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
         type: 'response.create',
         response: {
           modalities: ['audio', 'text'],
-          instructions: \"Thank you for your time. I'll connect you to a human representative now.\",
+          instructions: "Thank you for your time. I'll connect you to a human representative now.",
         }
       });
       setHandoffInProgress(true);

@@ -13,14 +13,14 @@ export default function TermsPage() {
             <li>
               AI Assistant Disclosure: You understand that you will be interacting with an artificial intelligence
               system designed to conduct SNAP eligibility interviews. This AI assistant is not a human but follows
-              Connecticut DSS guidelines.
+              State of Fake State guidelines.
             </li>
             <li>
               Recording & Quality Assurance: Your interview may be recorded and transcribed to ensure quality and
               accuracy.
             </li>
             <li>
-              Human Review: All information collected will be reviewed by qualified DSS staff who make the final
+              Human Review: All information collected will be reviewed by qualified state staff who make the final
               eligibility determination. The AI does not make decisions about your benefits.
             </li>
             <li>

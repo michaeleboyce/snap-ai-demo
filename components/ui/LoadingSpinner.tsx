@@ -23,7 +23,7 @@ export default function LoadingSpinner({
     <div className={`flex items-center gap-2 ${className}`}>
       <Loader2 className={`${sizeConfig[size]} animate-spin text-gray-600`} />
       {text && (
-        <span className=\"text-gray-600\">{text}</span>
+        <span className="text-gray-600\">{text}</span>
       )}
     </div>
   );

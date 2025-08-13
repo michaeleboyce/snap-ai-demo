@@ -198,7 +198,13 @@ export async function updateInterviewStatus(
   reviewNotes?: string,
   denialReason?: string
 ) {
-  const updateData: any = {
+  const updateData: {
+    status: string;
+    lastUpdated: Date;
+    reviewNotes?: string;
+    denialReason?: string;
+    reviewedAt?: Date;
+  } = {
     status,
     lastUpdated: new Date(),
   };

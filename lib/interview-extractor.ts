@@ -126,6 +126,11 @@ export function extractInterviewData(transcript: string): Partial<ExtractedInter
   if (householdMatch) {
     data.household!.size = parseInt(householdMatch[1]);
   }
+  
+  // Also check for "live by myself" or "living alone" patterns
+  if (/live by myself|living alone|I live alone|by myself/i.test(transcript)) {
+    data.household!.size = 1;
+  }
 
   // Check for elderly members
   if (/\b(?:elderly|senior|65|sixty.?five|retirement|retired)\b/i.test(transcript)) {
@@ -147,18 +152,41 @@ export function extractInterviewData(transcript: string): Partial<ExtractedInter
     data.household!.hasPregnantMember = true;
   }
 
-  // Extract income amounts
-  const incomeMatches = transcript.matchAll(/\$?([\d,]+)\s*(?:per|a|\/)\s*(week|month|year|hour)/gi);
-  for (const match of incomeMatches) {
-    const amount = parseInt(match[1].replace(/,/g, ''));
-    const frequency = match[2].toLowerCase();
+  // Extract income amounts - look for various patterns
+  // First check for explicit total income statements
+  const totalIncomeMatch = transcript.match(/total income (?:of )?\$?([\d,]+)/i);
+  if (totalIncomeMatch) {
+    const totalAmount = parseInt(totalIncomeMatch[1].replace(/,/g, ''));
+    data.income!.totalMonthly = totalAmount;
+  } else {
+    // If no explicit total, extract individual amounts
+    // Track what we've already matched to avoid double counting
+    const processedRanges = new Set();
     
-    let monthlyAmount = amount;
-    if (frequency.includes('week')) monthlyAmount = amount * 4.33;
-    else if (frequency.includes('year')) monthlyAmount = amount / 12;
-    else if (frequency.includes('hour')) monthlyAmount = amount * 173; // Assuming full-time
+    // First pass: look for structured "per X" patterns
+    const incomeMatches = [...transcript.matchAll(/\$?([\d,]+)\s*(?:per|a|\/)\s*(week|month|year|hour)/gi)];
+    for (const match of incomeMatches) {
+      const amount = parseInt(match[1].replace(/,/g, ''));
+      const frequency = match[2].toLowerCase();
+      
+      let monthlyAmount = amount;
+      if (frequency.includes('week')) monthlyAmount = amount * 4.33;
+      else if (frequency.includes('year')) monthlyAmount = amount / 12;
+      else if (frequency.includes('hour')) monthlyAmount = amount * 173; // Assuming full-time
+      
+      data.income!.totalMonthly += monthlyAmount;
+      processedRanges.add(`${match.index}-${match.index + match[0].length}`);
+    }
     
-    data.income!.totalMonthly += monthlyAmount;
+    // Second pass: look for "from X" patterns, but avoid already processed ranges
+    const directIncomeMatches = [...transcript.matchAll(/\$([\d,]+)\s*from/gi)];
+    for (const match of directIncomeMatches) {
+      const range = `${match.index}-${match.index + match[0].length}`;
+      if (!processedRanges.has(range)) {
+        const amount = parseInt(match[1].replace(/,/g, ''));
+        data.income!.totalMonthly += amount;
+      }
+    }
   }
 
   // Check for employment
@@ -176,22 +204,29 @@ export function extractInterviewData(transcript: string): Partial<ExtractedInter
     data.income!.hasSocialSecurity = true;
   }
 
-  // Extract rent amount
-  const rentMatch = transcript.match(/rent.*?\$?([\d,]+)/i);
+  // Extract rent amount - be more specific to avoid conflicts
+  const rentMatch = transcript.match(/rent.*?\$([\d,]+)/i);
   if (rentMatch) {
     data.expenses!.rent = parseInt(rentMatch[1].replace(/,/g, ''));
   }
 
-  // Extract utilities
-  const utilityMatch = transcript.match(/utilit.*?\$?([\d,]+)/i);
+  // Extract utilities - be more specific to avoid conflicts
+  const utilityMatch = transcript.match(/utilit.*?\$([\d,]+)/i);
   if (utilityMatch) {
     data.expenses!.utilities = parseInt(utilityMatch[1].replace(/,/g, ''));
   }
 
-  // Check for medical expenses
-  const medicalMatch = transcript.match(/(?:medical|doctor|prescription|medicine).*?\$?([\d,]+)/i);
+  // Check for medical expenses - be more specific to avoid conflicts
+  const medicalMatch = transcript.match(/(?:medical costs?|medical expenses).*?\$([\d,]+)/i) || transcript.match(/(?:prescription|medicine).*?\$([\d,]+)/i);
   if (medicalMatch) {
     data.expenses!.medical = parseInt(medicalMatch[1].replace(/,/g, ''));
+  }
+  
+  // Extract grocery expenses (don't count as deductible, just for information)
+  const groceryMatch = transcript.match(/\$([\d,]+)\s*(?:for groceries|groceries|food)/i) || transcript.match(/(?:groceries|food).*?\$?([\d,]+)/i);
+  if (groceryMatch) {
+    // Groceries aren't deductible expenses for SNAP calculation, so don't include in other
+    // data.expenses!.other = (data.expenses!.other || 0) + parseInt(groceryMatch[1].replace(/,/g, ''));
   }
 
   // Check for urgent needs
@@ -223,7 +258,7 @@ export function calculateSNAPEligibility(data: Partial<ExtractedInterviewData>):
   const household = data.household || { size: 1, hasElderly: false, hasDisabled: false };
   const income = data.income || { totalMonthly: 0 };
   
-  // 2024 SNAP income limits (example for Connecticut)
+  // 2024 SNAP income limits (example for typical state)
   const grossIncomeLimits: Record<number, number> = {
     1: 1580,
     2: 2137,

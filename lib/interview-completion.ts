@@ -86,7 +86,7 @@ export function getCompletionPercentage(coverage: SectionCoverage): number {
 /**
  * Get user-friendly completion status message
  */
-export function getCompletionStatus(coverage: SectionCoverage | null, messageCount: number): string {
+export function getCompletionStatus(coverage: SectionCoverage | null): string {
   if (!coverage) {
     return 'Starting interview...';
   }

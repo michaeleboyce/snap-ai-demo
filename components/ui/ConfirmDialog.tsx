@@ -63,23 +63,23 @@ export default function ConfirmDialog({
   const Icon = config.icon;
 
   return (
-    <div className=\"fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4\">
-      <div className=\"bg-white rounded-xl shadow-2xl max-w-md w-full\">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
         <div className={`p-6 ${config.bgColor} ${config.borderColor} border rounded-t-xl`}>
-          <div className=\"flex items-center gap-3\">
+          <div className="flex items-center gap-3">
             <Icon className={`w-6 h-6 ${config.iconColor} flex-shrink-0`} />
-            <h3 className=\"text-lg font-semibold text-gray-900\">{title}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           </div>
         </div>
         
-        <div className=\"p-6\">
-          <p className=\"text-gray-700 mb-4\">{message}</p>
+        <div className="p-6">
+          <p className="text-gray-700 mb-4">{message}</p>
           {children}
           
-          <div className=\"flex gap-3 justify-end\">
+          <div className="flex gap-3 justify-end">
             <button
               onClick={onCancel}
-              className=\"px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors\"
+              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               {cancelText}
             </button>

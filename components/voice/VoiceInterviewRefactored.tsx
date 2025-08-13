@@ -48,7 +48,7 @@ export default function VoiceInterviewRefactored({
 
   const handleConsentDecline = useCallback(() => {
     setShowConsent(false);
-    alert('Please call 1-855-6-CONNECT to schedule a human interview.');
+    alert('Please call 1-800-555-SNAP to schedule a human interview.');
   }, []);
 
   const handleConsentAccept = useCallback(() => {
@@ -97,7 +97,7 @@ export default function VoiceInterviewRefactored({
   }, [connectionState, isAISpeaking, isProcessing]);
 
   return (
-    <div className=\"flex flex-col items-center gap-4 p-6 bg-gradient-to-br from-blue-50 to-green-50 rounded-xl border-2 border-green-200\">
+    <div className="flex flex-col items-center gap-4 p-6 bg-gradient-to-br from-blue-50 to-green-50 rounded-xl border-2 border-green-200\">
       {/* Instructions (only when idle) */}
       <VoiceInstructions connectionState={connectionState} />
       

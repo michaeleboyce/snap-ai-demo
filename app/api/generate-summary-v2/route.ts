@@ -53,9 +53,44 @@ export async function POST(request: Request) {
 
     const aiSummary = JSON.parse(aiContent || '{}');
 
-    // Combine AI analysis with extracted data
+    // Combine AI analysis with extracted data, ensuring proper structure for UI components
     const enhancedSummary = {
       ...aiSummary,
+      // Map extracted data to the format expected by UI components
+      household: {
+        size: extractedData.household?.size || 0,
+        composition_notes: extractedData.household?.hasElderly ? 'Household includes elderly member(s)' : 
+                          extractedData.household?.hasDisabled ? 'Household includes disabled member(s)' : 'No special notes',
+        members: extractedData.household?.members || [],
+        ...aiSummary.household,
+      },
+      income: {
+        total_monthly: extractedData.income?.totalMonthly || 0,
+        verification_needed: false,
+        sources: extractedData.income?.sources || [],
+        ...aiSummary.income,
+      },
+      expenses: {
+        rent: extractedData.expenses?.rent || 0,
+        utilities: extractedData.expenses?.utilities || 0,
+        medical: extractedData.expenses?.medical || 0,
+        total_deductions: extractedData.expenses?.totalMonthly || 0,
+        ...aiSummary.expenses,
+      },
+      eligibility_assessment: {
+        likely_eligible: eligibilityResult.isEligible ? 'Yes' : 'No',
+        expedited_qualifying: extractedData.flags?.expeditedProcessing ? 'Yes' : 'No',
+        confidence_score: eligibilityResult.isEligible ? 85 : 0,
+        estimated_benefit: eligibilityResult.estimatedBenefit || 0,
+        reasons: eligibilityResult.reasons || [],
+        ...aiSummary.eligibility_assessment,
+      },
+      flags: {
+        urgent_needs: extractedData.flags?.urgentNeeds || [],
+        verification_required: extractedData.flags?.needsDocumentVerification || [],
+        ...aiSummary.flags,
+      },
+      // Keep metadata and raw extracted data for reference
       extracted_data: extractedData,
       eligibility_calculation: eligibilityResult,
       metadata: {

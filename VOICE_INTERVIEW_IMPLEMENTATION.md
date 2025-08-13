@@ -6,7 +6,7 @@ The SNAP Voice Interview Assistant has been completely rewritten using the offic
 ## Key Components
 
 ### 1. **RealtimeAgent Configuration** (`lib/realtime-agent.ts`)
-- Defines the SNAP interviewer agent with Connecticut DSS guidelines
+- Defines the SNAP interviewer agent with Fake State HHS guidelines
 - Includes structured interview flow following QA best practices
 - Implements tools for escalation and benefit calculation
 - Configures voice, turn detection, and transcription settings
@@ -135,9 +135,9 @@ The AI follows this structured flow:
 7. Create backup recording system
 8. Add quality assurance reviews
 
-## Connecticut DSS Alignment
+## Fake State Human  Alignment
 
-The implementation follows Connecticut DSS requirements:
+The implementation follows Fake State Human Services requirements:
 - Structured QA-style interview methodology
 - Discrepancy detection and clarification
 - Complete information gathering

@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "test:race-conditions": "vitest run --reporter=verbose __tests__/interview-creation.test.ts __tests__/useCompletion.test.ts __tests__/integration/voice-interview-flow.test.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
@@ -30,22 +32,21 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@jest/globals": "^30.0.5",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
-    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
     "dotenv": "^17.2.1",
     "drizzle-kit": "^0.31.4",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
-    "jest": "^30.0.5",
-    "jest-environment-jsdom": "^30.0.5",
+    "jsdom": "^26.1.0",
     "tailwindcss": "^4",
-    "ts-jest": "^29.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

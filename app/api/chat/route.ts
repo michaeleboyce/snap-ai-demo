@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     ];
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: 'gpt-4-turbo-preview',
       messages: openaiMessages,
       max_completion_tokens: 500,
     });

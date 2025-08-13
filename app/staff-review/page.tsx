@@ -202,7 +202,7 @@ export default function StaffReviewPage() {
                     </div>
                   </div>
                   <div>
-                <StatusBadge status={(interview.status as any) || 'in_progress'} />
+                <StatusBadge status={(interview.status as 'in_progress' | 'completed' | 'approved' | 'denied' | 'needs_info') || 'in_progress'} />
                   </div>
                 </div>
               </div>
@@ -293,7 +293,7 @@ function InterviewDetailModal({ interview, onClose, onStatusChange }: InterviewD
     // Create letter content
     const letterDate = new Date().toLocaleDateString();
     const letterContent = `
-CONNECTICUT DEPARTMENT OF SOCIAL SERVICES
+DEPARTMENT OF HUMAN SERVICES
 SNAP BENEFITS DETERMINATION LETTER
 
 Date: ${letterDate}
@@ -315,7 +315,7 @@ Your benefits will begin on the first of next month. You will receive your EBT c
 
 Important Next Steps:
 1. Watch for your EBT card in the mail
-2. Call 1-800-997-2555 to activate your card
+2. Call "1-800-555-SNAP" to activate your card
 3. Report any changes in income or household size immediately` 
 : 
 `We regret to inform you that your application for SNAP benefits has been DENIED.
@@ -326,19 +326,19 @@ ${notes ? `Additional Information: ${notes}` : ''}
 
 Your Right to Appeal:
 You have the right to appeal this decision within 90 days. To request a fair hearing:
-- Call: 1-855-6-CONNECT
-- Write to: DSS Fair Hearing Unit, 55 Farmington Ave, Hartford, CT 06105
-- Visit your local DSS office`}
+- Call: 1-800-555-SNAP
+- Write to: Human Services Department Fair Hearing Unit, 123 Main St. Anytown, USA 12345
+- Visit your local Human Services Department office`}
 
 ${notes && status === 'approved' ? `\nCase Notes: ${notes}` : ''}
 
 If you have questions about this determination, please contact:
-Phone: 1-855-6-CONNECT (1-855-626-6632)
-Website: www.ct.gov/dss
+Phone: 1-800-555-SNAP
+Website: www.fakestate.gov/hhs
 
 Sincerely,
 
-Connecticut Department of Social Services
+Fake Health and Human Services Department
 SNAP Benefits Unit
 
 This determination was made on ${letterDate} following review of your AI-assisted interview completed on ${interview.completedAt ? new Date(interview.completedAt).toLocaleDateString() : 'N/A'}.
