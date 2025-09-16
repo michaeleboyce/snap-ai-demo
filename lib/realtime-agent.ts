@@ -255,7 +255,8 @@ snapInterviewAgent.tools = [
 
 // Export configuration for the session
 export const sessionConfig = {
-  model: 'gpt-4o-realtime-preview-2025-06-03',
+  //model: 'gpt-4o-realtime-preview-2025-06-03',
+  model: 'gpt-realtime',
   config: {
     voice: 'alloy',
     inputAudioFormat: 'pcm16' as const,

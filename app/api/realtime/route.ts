@@ -15,7 +15,8 @@ export async function GET() {
   return new Response(
     JSON.stringify({
       url: 'wss://api.openai.com/v1/realtime',
-      model: 'gpt-4o-realtime-preview-2024-12-17',
+      //model: 'gpt-4o-realtime-preview-2024-12-17',
+      model: 'gpt-realtime',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'OpenAI-Beta': 'realtime=v1'
