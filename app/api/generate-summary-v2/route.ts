@@ -1,3 +1,26 @@
+/**
+ * Enhanced Summary Generation Endpoint (v2)
+ *
+ * This is the CURRENT/RECOMMENDED endpoint for generating interview summaries.
+ *
+ * Features:
+ * - Structured data extraction via extractInterviewData()
+ * - SNAP eligibility calculations via calculateSNAPEligibility()
+ * - Enhanced summary format optimized for UI components
+ * - Combines AI analysis with rule-based extraction
+ * - Proper typing for downstream consumption
+ *
+ * Used by: hooks/useCompletion.ts
+ *
+ * Returns enhanced summary with sections:
+ * - household (size, composition, members)
+ * - income (sources, amounts, totals)
+ * - expenses (rent, utilities, medical, etc.)
+ * - eligibility_assessment (likely_eligible, estimated_benefit, confidence_score)
+ * - flags (urgent needs, verification required)
+ * - metadata (session_id, model used, timestamps)
+ */
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { interviews } from '@/lib/db/schema';

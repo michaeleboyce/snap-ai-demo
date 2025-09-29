@@ -1,3 +1,16 @@
+/**
+ * DEPRECATED: Use /api/generate-summary-v2 instead
+ *
+ * This endpoint provides basic summary generation using GPT.
+ * The v2 endpoint includes:
+ * - Structured data extraction (extractInterviewData)
+ * - Eligibility calculations (calculateSNAPEligibility)
+ * - Enhanced summary format for UI components
+ * - Better error handling
+ *
+ * Kept for backwards compatibility but should not be used for new features.
+ */
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { interviews } from '@/lib/db/schema';
