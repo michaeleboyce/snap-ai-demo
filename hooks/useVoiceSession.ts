@@ -96,7 +96,7 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
               try {
                 // Send empty message to trigger AI's initial greeting
                 // The agent instructions specify it should speak first
-                session.sendMessage({ role: 'user', content: [] });
+                session.sendMessage({ type: 'message', role: 'user', content: [{ type: 'input_text', text: '' }] });
                 console.log('[useVoiceSession] Sent empty message to trigger AI greeting');
               } catch (err) {
                 console.error('[useVoiceSession] Error triggering initial response:', err);
