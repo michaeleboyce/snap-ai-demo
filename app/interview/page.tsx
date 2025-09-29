@@ -382,14 +382,14 @@ function InterviewContent() {
           {!isTextMode && (
             <div className="px-6 pt-4">
               <div className="flex flex-col items-center gap-4">
-                <VoiceInterview 
+                <VoiceInterview
                   onTranscript={handleVoiceTranscript}
                   onConnectionChange={setIsConnected}
                   hasConsented={hasConsented}
                   onUserSpeechStart={() => {
                     // placeholder for future UI actions when speech starts
                   }}
-                  initialMessages={isDemo ? messages.map(m => ({ role: m.role, content: m.content })) : undefined}
+                  initialMessages={messages.length > 0 ? messages.map(m => ({ role: m.role, content: m.content })) : undefined}
                 />
               </div>
             </div>

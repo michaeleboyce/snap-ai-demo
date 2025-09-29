@@ -80,10 +80,32 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
       // Set up transport event listeners
       if (session.transport) {
         console.log('[useVoiceSession] Setting up transport event listeners...');
-        
+
         session.transport.on('*', (event: unknown) => {
           const typedEvent = event as { type?: string; transcript?: string; delta?: string; text?: string };
-          
+
+          // Trigger initial AI response when session is ready
+          // Only trigger if there are no initial messages (fresh interview)
+          if (typedEvent.type === 'session.created' && !hasTriggeredRef.current) {
+            hasTriggeredRef.current = true;
+
+            // If there are initial messages, the conversation is already in progress
+            // so don't trigger a new greeting
+            if (!initialMessages || initialMessages.length === 0) {
+              console.log('[useVoiceSession] Session created, triggering initial AI response...');
+              try {
+                // Send empty message to trigger AI's initial greeting
+                // The agent instructions specify it should speak first
+                session.sendMessage({ role: 'user', content: [] });
+                console.log('[useVoiceSession] Sent empty message to trigger AI greeting');
+              } catch (err) {
+                console.error('[useVoiceSession] Error triggering initial response:', err);
+              }
+            } else {
+              console.log('[useVoiceSession] Session created with existing messages, not triggering initial greeting');
+            }
+          }
+
           // Handle user input transcription
           if (typedEvent.type === 'conversation.item.input_audio_transcription.completed') {
             if (typedEvent.transcript) {
@@ -95,7 +117,7 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
               }
             }
           }
-          
+
           // Handle assistant transcript chunks (streaming)
           if (typedEvent.type === 'response.audio_transcript.delta') {
             if (typedEvent.delta) {
@@ -105,14 +127,14 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
               }));
             }
           }
-          
+
           // Handle completed assistant transcript
           if (typedEvent.type === 'response.audio_transcript.done') {
             if (typedEvent.transcript) {
               console.log('[Assistant Transcript]', typedEvent.transcript);
               onTranscript(typedEvent.transcript, 'assistant');
               setPartialTranscript(prev => ({ ...prev, assistant: '' }));
-              
+
               if (handoffInProgress) {
                 console.log('[useVoiceSession] Transcript.done during handoff; disconnecting and signaling ready');
                 if (handoffTimeoutRef.current) {
@@ -131,14 +153,10 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
           if (typedEvent.type === 'response.audio.delta') {
             setIsAISpeaking(true);
             setIsProcessing(false);
-            if (kickstartTimeoutRef.current) {
-              window.clearTimeout(kickstartTimeoutRef.current);
-              kickstartTimeoutRef.current = null;
-            }
           } else if (typedEvent.type === 'response.audio.done' || typedEvent.type === 'response.done') {
             setIsAISpeaking(false);
             setIsProcessing(false);
-            
+
             if (handoffInProgress) {
               console.log('[useVoiceSession] Received response.done during handoff; disconnecting and signaling ready');
               setHandoffInProgress(false);
@@ -198,63 +216,7 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
         }
       }
 
-      // Trigger initial response
-      if (!hasTriggeredRef.current) {
-        hasTriggeredRef.current = true;
-        
-        const triggerInitialResponse = () => {
-          console.log('[useVoiceSession] Attempting to trigger initial response...');
-          
-          if ((session as any).createResponse) {
-            console.log('[useVoiceSession] Using session.createResponse()');
-            (session as any).createResponse();
-            return true;
-          }
-          
-          const transport = session.transport as any;
-          if (transport && transport.send) {
-            console.log('[useVoiceSession] Using transport.send()');
-            transport.send({
-              type: 'response.create',
-              response: {
-                modalities: ['audio', 'text'],
-                instructions: undefined
-              }
-            });
-            return true;
-          }
-          
-          return false;
-        };
-        
-        if (!triggerInitialResponse()) {
-          setTimeout(() => {
-            if (!triggerInitialResponse()) {
-              console.log('[useVoiceSession] Failed to trigger initial response after retry');
-            }
-          }, 500);
-        }
-
-        // Fallback kickstart
-        kickstartTimeoutRef.current = window.setTimeout(() => {
-          if (!isAISpeaking && sessionRef.current) {
-            console.log('[useVoiceSession] Forcing initial response (fallback after 2s)');
-            const transport = sessionRef.current.transport as any;
-            if (transport && transport.send) {
-              transport.send({
-                type: 'conversation.item.create',
-                item: {
-                  type: 'message',
-                  role: 'user',
-                  content: [{ type: 'input_text', text: 'Start the interview' }]
-                }
-              });
-              transport.send({ type: 'response.create' });
-            }
-          }
-          kickstartTimeoutRef.current = null;
-        }, 2000);
-      }
+      // Initial response will be triggered by session.created event (see transport listener above)
 
     } catch (err) {
       console.error('[useVoiceSession] Connection failed:', err);
@@ -334,51 +296,12 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
     }
 
     const newMuted = !isMuted;
-    setIsMuted(newMuted);
 
-    // Actually mute/unmute the microphone audio track
     try {
-      const session = sessionRef.current;
-      const transport = session.transport as unknown as Record<string, unknown>;
-
-      if (!transport) {
-        console.warn('[useVoiceSession] No transport available for muting');
-        return;
-      }
-
-      let tracksMuted = 0;
-
-      // Check all possible locations for audio streams
-      const candidateKeys = [
-        'mediaStream',
-        'localStream',
-        'microphoneStream',
-        'inputStream',
-        'audioStream',
-        'userMediaStream'
-      ];
-
-      console.log('[useVoiceSession] Searching for audio tracks in transport...');
-
-      for (const key of candidateKeys) {
-        const maybeStream = transport[key];
-        if (maybeStream && typeof (maybeStream as MediaStream).getAudioTracks === 'function') {
-          const audioTracks = (maybeStream as MediaStream).getAudioTracks();
-          console.log(`[useVoiceSession] Found ${audioTracks.length} audio track(s) in transport.${key}`);
-
-          audioTracks.forEach((track: MediaStreamTrack) => {
-            track.enabled = !newMuted;
-            tracksMuted++;
-            console.log(`[useVoiceSession] Track ${track.id} (${track.label}):`, newMuted ? 'MUTED' : 'UNMUTED');
-          });
-        }
-      }
-
-      if (tracksMuted === 0) {
-        console.warn('[useVoiceSession] No audio tracks found to mute. Available keys:', Object.keys(transport));
-      } else {
-        console.log(`[useVoiceSession] Successfully ${newMuted ? 'muted' : 'unmuted'} ${tracksMuted} audio track(s)`);
-      }
+      // Use the built-in mute() method provided by RealtimeSession
+      sessionRef.current.mute(newMuted);
+      setIsMuted(newMuted);
+      console.log(`[useVoiceSession] ${newMuted ? 'Muted' : 'Unmuted'} microphone via session.mute()`);
     } catch (err) {
       console.error('[useVoiceSession] Error toggling mute:', err);
     }
