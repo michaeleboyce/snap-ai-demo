@@ -328,39 +328,60 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
   }, [onConnectionChange]);
 
   const handleToggleMute = useCallback(() => {
-    if (!sessionRef.current) return;
+    if (!sessionRef.current) {
+      console.warn('[useVoiceSession] Cannot mute: no active session');
+      return;
+    }
 
     const newMuted = !isMuted;
     setIsMuted(newMuted);
 
     // Actually mute/unmute the microphone audio track
     try {
-      const transport = sessionRef.current.transport as unknown as {
-        mediaStream?: MediaStream;
-      } & Record<string, unknown>;
+      const session = sessionRef.current;
+      const transport = session.transport as unknown as Record<string, unknown>;
 
-      if (transport.mediaStream) {
-        transport.mediaStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
-          track.enabled = !newMuted;
-        });
-        console.log('[useVoiceSession] Microphone', newMuted ? 'muted' : 'unmuted');
+      if (!transport) {
+        console.warn('[useVoiceSession] No transport available for muting');
+        return;
       }
 
-      // Also check for other potential audio input streams
-      const candidateKeys = ['localStream', 'microphoneStream', 'inputStream'];
+      let tracksMuted = 0;
+
+      // Check all possible locations for audio streams
+      const candidateKeys = [
+        'mediaStream',
+        'localStream',
+        'microphoneStream',
+        'inputStream',
+        'audioStream',
+        'userMediaStream'
+      ];
+
+      console.log('[useVoiceSession] Searching for audio tracks in transport...');
+
       for (const key of candidateKeys) {
-        const maybeStream = (transport as Record<string, unknown>)[key];
-        if (maybeStream && typeof (maybeStream as { getAudioTracks?: () => MediaStreamTrack[] }).getAudioTracks === 'function') {
-          (maybeStream as MediaStream).getAudioTracks().forEach((track: MediaStreamTrack) => {
+        const maybeStream = transport[key];
+        if (maybeStream && typeof (maybeStream as MediaStream).getAudioTracks === 'function') {
+          const audioTracks = (maybeStream as MediaStream).getAudioTracks();
+          console.log(`[useVoiceSession] Found ${audioTracks.length} audio track(s) in transport.${key}`);
+
+          audioTracks.forEach((track: MediaStreamTrack) => {
             track.enabled = !newMuted;
+            tracksMuted++;
+            console.log(`[useVoiceSession] Track ${track.id} (${track.label}):`, newMuted ? 'MUTED' : 'UNMUTED');
           });
         }
+      }
+
+      if (tracksMuted === 0) {
+        console.warn('[useVoiceSession] No audio tracks found to mute. Available keys:', Object.keys(transport));
+      } else {
+        console.log(`[useVoiceSession] Successfully ${newMuted ? 'muted' : 'unmuted'} ${tracksMuted} audio track(s)`);
       }
     } catch (err) {
       console.error('[useVoiceSession] Error toggling mute:', err);
     }
-
-    console.log('[useVoiceSession] Mute toggled:', newMuted);
   }, [isMuted]);
 
   const requestHumanHandoff = useCallback(() => {

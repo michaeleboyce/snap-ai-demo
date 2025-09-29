@@ -32,11 +32,11 @@ export default function VoiceInterview({
     error,
     partialTranscript,
     hasUserSpoken,
-    handoffInProgress,
+    // handoffInProgress and requestHumanHandoff not used in this component
+    // (handoff is managed by useVoiceSession internally)
     handleConnect,
     handleDisconnect,
     handleToggleMute,
-    requestHumanHandoff,
   } = useVoiceSession({
     onTranscript,
     onConnectionChange,
