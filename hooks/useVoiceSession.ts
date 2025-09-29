@@ -329,9 +329,37 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
 
   const handleToggleMute = useCallback(() => {
     if (!sessionRef.current) return;
-    
+
     const newMuted = !isMuted;
     setIsMuted(newMuted);
+
+    // Actually mute/unmute the microphone audio track
+    try {
+      const transport = sessionRef.current.transport as unknown as {
+        mediaStream?: MediaStream;
+      } & Record<string, unknown>;
+
+      if (transport.mediaStream) {
+        transport.mediaStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+          track.enabled = !newMuted;
+        });
+        console.log('[useVoiceSession] Microphone', newMuted ? 'muted' : 'unmuted');
+      }
+
+      // Also check for other potential audio input streams
+      const candidateKeys = ['localStream', 'microphoneStream', 'inputStream'];
+      for (const key of candidateKeys) {
+        const maybeStream = (transport as Record<string, unknown>)[key];
+        if (maybeStream && typeof (maybeStream as { getAudioTracks?: () => MediaStreamTrack[] }).getAudioTracks === 'function') {
+          (maybeStream as MediaStream).getAudioTracks().forEach((track: MediaStreamTrack) => {
+            track.enabled = !newMuted;
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[useVoiceSession] Error toggling mute:', err);
+    }
+
     console.log('[useVoiceSession] Mute toggled:', newMuted);
   }, [isMuted]);
 

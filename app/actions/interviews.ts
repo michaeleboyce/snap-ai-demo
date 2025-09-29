@@ -276,68 +276,31 @@ export async function deleteEmptyInterviews() {
   }
 }
 
-// Helper function to analyze transcript and extract information
+/**
+ * Helper function to extract basic metadata from transcript
+ * Note: Coverage assessment is handled by AI tools (assess_coverage, check_interview_complete)
+ * This function only extracts simple metadata like household size, income, and flags
+ */
 function analyzeTranscriptSections(transcript: Array<{role: 'user' | 'assistant', content: string}>) {
   const fullText = transcript.map(t => t.content).join(' ').toLowerCase();
-  
-  const sections = {
-    household: false,
-    income: false,
-    expenses: false,
-    assets: false,
-    special: false,
-  };
-  
-  // Check for household composition discussion
-  if (fullText.includes('household') || fullText.includes('lives with') || fullText.includes('family')) {
-    sections.household = true;
-  }
-  
-  // Check for income discussion
-  if (fullText.includes('income') || fullText.includes('earn') || fullText.includes('salary') || fullText.includes('wages')) {
-    sections.income = true;
-  }
-  
-  // Check for expenses discussion
-  if (fullText.includes('rent') || fullText.includes('mortgage') || fullText.includes('utilities') || fullText.includes('expenses')) {
-    sections.expenses = true;
-  }
-  
-  // Check for assets discussion
-  if (fullText.includes('bank account') || fullText.includes('savings') || fullText.includes('vehicle') || fullText.includes('assets')) {
-    sections.assets = true;
-  }
-  
-  // Check for special circumstances
-  if (fullText.includes('disability') || fullText.includes('elderly') || fullText.includes('pregnant') || fullText.includes('student')) {
-    sections.special = true;
-  }
-  
-  // Determine current section based on what's been completed
-  let currentSection = 'household';
-  if (sections.household) currentSection = 'income';
-  if (sections.income) currentSection = 'expenses';
-  if (sections.expenses) currentSection = 'assets';
-  if (sections.assets) currentSection = 'special';
-  if (sections.special) currentSection = 'summary';
-  
-  // Extract applicant information (simplified extraction)
+
+  // Extract applicant information using simple pattern matching
   let applicantName: string | undefined;
   let householdSize: number | undefined;
   let monthlyIncome: number | undefined;
-  
+
   // Try to extract household size
   const householdMatch = fullText.match(/(\d+)\s*(?:people|person|members?)/);
   if (householdMatch) {
     householdSize = parseInt(householdMatch[1]);
   }
-  
+
   // Try to extract monthly income
   const incomeMatch = fullText.match(/\$?(\d+(?:,\d{3})*)\s*(?:per month|monthly|\/mo)/);
   if (incomeMatch) {
     monthlyIncome = parseInt(incomeMatch[1].replace(/,/g, ''));
   }
-  
+
   // Identify any flags or issues
   const flags: string[] = [];
   if (fullText.includes('not sure') || fullText.includes("don't know")) {
@@ -346,12 +309,12 @@ function analyzeTranscriptSections(transcript: Array<{role: 'user' | 'assistant'
   if (fullText.includes('complex') || fullText.includes('complicated')) {
     flags.push('Complex case');
   }
-  
+
+  // Note: Coverage assessment removed - now handled by AI tools
+  // currentSection and completedSections are no longer calculated here
   return {
-    currentSection,
-    completedSections: Object.entries(sections)
-      .filter(([, completed]) => completed)
-      .map(([section]) => section),
+    currentSection: undefined as string | undefined,
+    completedSections: [] as string[],
     applicantName,
     householdSize,
     monthlyIncome,
