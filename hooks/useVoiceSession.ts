@@ -13,9 +13,10 @@ interface UseVoiceSessionProps {
   onTranscript: (transcript: string, role: 'user' | 'assistant') => void;
   onConnectionChange: (connected: boolean) => void;
   onUserSpeechStart?: () => void;
+  initialMessages?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
-export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeechStart }: UseVoiceSessionProps) {
+export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeechStart, initialMessages }: UseVoiceSessionProps) {
   const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [isMuted, setIsMuted] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
@@ -179,6 +180,24 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
       setIsProcessing(false);
       onConnectionChange(true);
 
+      // Add initial messages from demo scenario if provided
+      if (initialMessages && initialMessages.length > 0) {
+        console.log('[useVoiceSession] Adding initial messages from demo scenario:', initialMessages.length);
+        const transport = session.transport as { send?: (data: unknown) => void };
+        if (transport && transport.send) {
+          for (const message of initialMessages) {
+            transport.send({
+              type: 'conversation.item.create',
+              item: {
+                type: 'message',
+                role: message.role,
+                content: [{ type: 'input_text', text: message.content }]
+              }
+            });
+          }
+        }
+      }
+
       // Trigger initial response
       if (!hasTriggeredRef.current) {
         hasTriggeredRef.current = true;
@@ -244,7 +263,7 @@ export function useVoiceSession({ onTranscript, onConnectionChange, onUserSpeech
       setIsProcessing(false);
       onConnectionChange(false);
     }
-  }, [connectionState, onTranscript, onConnectionChange, isAISpeaking, hasUserSpoken, onUserSpeechStart, handoffInProgress]);
+  }, [connectionState, onTranscript, onConnectionChange, isAISpeaking, hasUserSpoken, onUserSpeechStart, handoffInProgress, initialMessages]);
 
   const handleDisconnect = useCallback(() => {
     console.log('[useVoiceSession] Disconnecting...');
